@@ -1,0 +1,3685 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>test_ROSIE - LangGraph Dashboard</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: #f5f5f5; }
+        .app { display: flex; height: 100vh; }
+        .sidebar { width: 280px; background: white; border-right: 1px solid #ddd; display: flex; flex-direction: column; }
+        .header { padding: 20px; background: linear-gradient(135deg, #667eea, #764ba2); color: white; }
+        .node-palette { flex: 1; padding: 20px; overflow-y: auto; }
+        .node-item { background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 8px; padding: 12px; margin: 8px 0; cursor: move; display: flex; align-items: center; gap: 10px; }
+        .node-item:hover { background: #e9ecef; border-color: #667eea; }
+        .main { flex: 1; display: flex; flex-direction: column; }
+        .toolbar { padding: 15px 20px; background: white; border-bottom: 1px solid #ddd; display: flex; justify-content: space-between; align-items: center; }
+        .canvas { flex: 1; background: white; margin: 20px; border-radius: 8px; border: 2px dashed #ccc; position: relative; overflow: auto; }
+        .canvas-node { position: absolute; width: 120px; background: white; border: 2px solid; border-radius: 8px; padding: 10px; text-align: center; cursor: move; box-shadow: 0 2px 8px rgba(0,0,0,0.1); transition: transform 0.2s; z-index: 10; }
+        .canvas-node:hover { transform: scale(1.05); box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+        .canvas-node.start { border-color: #10B981; }
+        .canvas-node.end { border-color: #EF4444; }
+        .canvas-node.langgraph { border-color: #3B82F6; }
+        .canvas-node.custom { border-color: #F59E0B; }
+        .node-ports { display: flex; justify-content: space-between; margin-top: 8px; }
+        .port { width: 12px; height: 12px; border-radius: 50%; background: #ccc; cursor: pointer; position: relative; }
+        .port.input { background: #10B981; }
+        .port.output { background: #3B82F6; }
+        .port:hover { transform: scale(1.3); }
+        .port-tooltip { position: absolute; background: #333; color: white; padding: 4px 8px; border-radius: 4px; font-size: 11px; top: -25px; left: 50%; transform: translateX(-50%); white-space: nowrap; display: none; }
+        .port:hover .port-tooltip { display: block; }
+        .edge { position: absolute; pointer-events: none; z-index: 5; }
+        .edge-line { stroke: #667eea; stroke-width: 2; fill: none; }
+        .edge-arrow { fill: #667eea; }
+        .edge.selected .edge-line { stroke: #EF4444; stroke-width: 3; }
+        .edge.selected .edge-arrow { fill: #EF4444; }
+        .modal { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; z-index: 1000; }
+        .modal.active { display: flex; }
+        .modal-content { background: white; border-radius: 12px; width: 90%; max-width: 1000px; max-height: 85vh; display: flex; flex-direction: column; }
+        .modal-header { padding: 20px; border-bottom: 1px solid #ddd; display: flex; justify-content: space-between; align-items: center; }
+        .modal-body { flex: 1; padding: 20px; overflow: auto; }
+        .code-editor { width: 100%; height: 500px; font-family: 'Monaco', 'Menlo', 'Courier New', monospace; font-size: 14px; padding: 15px; border: 1px solid #ddd; border-radius: 6px; resize: none; background: #f8f9fa; }
+        .tab-container { display: flex; border-bottom: 1px solid #ddd; margin-bottom: 15px; }
+        .tab { padding: 10px 20px; cursor: pointer; border-bottom: 2px solid transparent; }
+        .tab.active { border-bottom: 2px solid #667eea; font-weight: 600; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        .param-row { display: flex; align-items: center; margin-bottom: 10px; }
+        .param-row label { width: 120px; font-size: 13px; }
+        .param-row input, .param-row select { flex: 1; padding: 6px 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 13px; }
+        .btn { padding: 8px 16px; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; display: inline-flex; align-items: center; gap: 8px; margin: 0 5px; }
+        .btn-primary { background: #667eea; color: white; }
+        .btn-success { background: #10B981; color: white; }
+        .btn-secondary { background: #6c757d; color: white; }
+        .btn-warning { background: #F59E0B; color: white; }
+        .btn-danger { background: #EF4444; color: white; }
+        .btn-sm { padding: 4px 8px; font-size: 12px; }
+        .status { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 500; }
+        .status-ready { background: #d1fae5; color: #065f46; }
+        .status-running { background: #fef3c7; color: #92400e; }
+        .status-error { background: #fee2e2; color: #991b1b; }
+        .log-panel { height: 320px; background: #0f172a; color: #e2e8f0; font-family: monospace; font-size: 12px; padding: 12px; overflow-y: auto; border-top: 1px solid #334155; }
+        .log-entry { margin-bottom: 2px; line-height: 1.5; }
+        .log-time   { color: #64748b; }
+        .log-info   { color: #94a3b8; }
+        .log-ok     { color: #4ade80; }
+        .log-error  { color: #f87171; }
+        .log-skip   { color: #fbbf24; }
+        .log-added  { color: #34d399; }
+        .log-changed{ color: #60a5fa; }
+        .log-key    { color: #e879f9; }
+        .log-val    { color: #fde68a; }
+        .log-sep    { color: #334155; }
+        .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        .section-title { font-weight: 600; color: #333; }
+        .node-count { background: #e9ecef; padding: 2px 8px; border-radius: 12px; font-size: 12px; color: #666; }
+        .mode-indicator { padding: 4px 12px; border-radius: 4px; background: #e9ecef; font-size: 12px; }
+        .mode-connecting { background: #fef3c7; color: #92400e; }
+        .template-selector { width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; margin-bottom: 10px; }
+        .result-panel { background: #f8f9fa; border: 1px solid #ddd; border-radius: 6px; padding: 15px; margin-top: 15px; max-height: 200px; overflow-y: auto; }
+        .result-item { margin-bottom: 8px; padding: 8px; background: white; border-radius: 4px; font-family: monospace; font-size: 12px; }
+        .node-name-input { padding: 6px 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 13px; margin-bottom: 10px; width: 100%; }
+        .node-props { display: flex; gap: 10px; margin-bottom: 10px; }
+        .node-prop { flex: 1; }
+        .node-prop label { display: block; font-size: 12px; color: #666; margin-bottom: 4px; }
+        .node-prop input, .node-prop select { width: 100%; padding: 6px 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 13px; }
+    </style>
+</head>
+<body>
+    <div class="app">
+        <div class="sidebar">
+            <div class="header">
+                <h3><i class="fas fa-project-diagram"></i> test_ROSIE</h3>
+                <p>LangGraph Dashboard</p>
+            </div>
+            <div class="node-palette" id="node-palette">
+                <div class="section-header">
+                    <h4 class="section-title">Your Nodes</h4>
+                    <span class="node-count" id="your-nodes-count">0</span>
+
+                    <button id="delete-node-btn" onclick="deleteSelectedNode()"
+            style="display:none; background-color: #EF4444; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 12px;">
+        <i class="fas fa-trash-alt"></i> Delete Selected
+    </button>
+
+                    <button onclick="deleteAllNodes()"
+            style="background-color: #EF4444; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 12px; margin-left: 4px;">
+        <i class="fas fa-trash"></i> Delete All
+    </button>
+
+                </div>
+                <div id="your-nodes">
+                    <div style="text-align: center; padding: 20px; color: #666; font-size: 14px;">
+                        No nodes yet. Click "New Node" to create one.
+                    </div>
+                </div>
+                <div class="section-header" style="margin-top:20px;">
+                    <h4 class="section-title" style="color:#3B82F6;"><i class="fas fa-code"></i> Code Nodes</h4>
+                    <button onclick="createNewNode('code')" style="background:#3B82F6;color:white;border:none;padding:3px 8px;border-radius:4px;cursor:pointer;font-size:11px;"><i class="fas fa-plus"></i> New</button>
+                </div>
+                <div id="code-nodes-list"></div>
+                <div class="section-header" style="margin-top:14px;">
+                    <h4 class="section-title" style="color:#F59E0B;"><i class="fas fa-magic"></i> LLM Nodes</h4>
+                    <button onclick="createNewNode('llm')" style="background:#F59E0B;color:white;border:none;padding:3px 8px;border-radius:4px;cursor:pointer;font-size:11px;"><i class="fas fa-plus"></i> New</button>
+                </div>
+                <div id="llm-nodes-list"></div>
+
+<div class="node-item" data-type="start" data-id="start" draggable="true" ondragstart="drag(event)" style="display: flex; align-items: center; cursor: grab;">
+    <i class="fas fa-play" style="color: #10B981;"></i>
+    <span style="margin-left: 8px; flex-grow: 1;">Start</span>
+    <div style="display: flex; gap: 4px;">
+        <button type="button" class="btn-icon" onclick="editCustomNode('start', event)" title="Edit Logic">
+            <i class="fas fa-edit"></i>
+        </button>
+        </div>
+</div>
+
+<div class="node-item" data-type="end" data-id="end" draggable="true" ondragstart="drag(event)" style="display: flex; align-items: center; cursor: grab;">
+    <i class="fas fa-stop" style="color: #EF4444;"></i>
+    <span style="margin-left: 8px; flex-grow: 1;">End</span>
+    <div style="display: flex; gap: 4px;">
+        <button type="button" class="btn-icon" onclick="editCustomNode('end', event)" title="Edit Logic">
+            <i class="fas fa-edit"></i>
+        </button>
+    </div>
+</div>
+
+<!--                <div class="node-item" data-type="custom" data-id="custom">-->
+<!--                    <i class="fas fa-plus" style="color: #F59E0B;"></i>-->
+<!--                    <span>Custom Node</span>-->
+<!--                </div>-->
+            </div>
+            <div style="padding: 20px; border-top: 1px solid #ddd;">
+                <!-- Undo/Redo -->
+                <div class="section-header" style="margin-bottom: 10px;">
+                    <h5 style="margin: 0;">Undo/Redo</h5>
+                </div>
+                <button class="btn btn-secondary" onclick="undoAction()" id="undo-btn" style="width: 48%; margin-right: 4%;" disabled>
+                    <i class="fas fa-undo"></i> Undo
+                </button>
+                <button class="btn btn-secondary" onclick="redoAction()" id="redo-btn" style="width: 48%;" disabled>
+                    <i class="fas fa-redo"></i> Redo
+                </button>
+                
+                <div class="section-header" style="margin-bottom: 10px; margin-top: 15px;">
+                    <h5 style="margin: 0;">Connection Mode</h5>
+                    <span class="mode-indicator" id="mode-indicator">Normal</span>
+                </div>
+                <button class="btn btn-warning" onclick="startConnectMode()" style="width: 100%; margin-bottom: 5px;">
+                    <i class="fas fa-link"></i> Connect Nodes
+                </button>
+                <button class="btn btn-danger" onclick="cancelConnectMode()" style="width: 100%; margin-bottom: 10px;">
+                    <i class="fas fa-times"></i> Cancel Connection State
+                </button>
+                <button class="btn btn-primary" onclick="saveWorkflow()" style="width: 100%;">
+                    <i class="fas fa-save"></i> Save Workflow
+                </button>
+
+<!--                <input type="file" id="import-file" style="display:none" onchange="handleFileImport(event)">-->
+<input type="file" id="import-file" style="display:none" onchange="handleFileImport(event)">
+                <button class="btn btn-info" onclick="document.getElementById('import-file').click()">
+    <i class="fas fa-upload"></i> Load JSON
+</button>
+
+                <button class="btn btn-secondary" onclick="exportWorkflowToFile()">
+                    <i class="fas fa-download"></i> Export JSON
+                </button>
+                <button class="btn btn-primary" onclick="exportPythonPackage()" style="width: 100%; margin-top: 6px;">
+                    <i class="fas fa-box"></i> Export Python Package
+                </button>
+                <button class="btn btn-success" onclick="runWorkflow()" style="width: 100%; margin-top: 10px;">
+                    <i class="fas fa-play"></i> Run Workflow
+                </button>
+                <button onclick="runUntilNode()" style="width: 100%; margin-top: 6px; padding: 8px; background:#F59E0B; color:#fff; border:none; border-radius:6px; cursor:pointer; font-size:13px;">
+                    <i class="fas fa-stop-circle"></i> Debug: Run Until Node
+                </button>
+                <button class="btn btn-secondary" onclick="showInitialDataModal()" style="width: 100%; margin-top: 6px;">
+                    <i class="fas fa-cog"></i> Set Initial Data
+                </button>
+            </div>
+        </div>
+        <div class="main">
+            <div class="toolbar">
+                <div>
+                    <h3 id="workflow-title">New Workflow</h3>
+                    <span class="status status-ready" id="status">Ready</span>
+                    <span style="margin-left: 10px; font-size: 12px; color: #666;" id="node-count-display">0 nodes</span>
+                    <span style="margin-left: 10px; font-size: 12px; color: #666;" id="edge-count-display">0 edges</span>
+
+                    <button class="btn btn-secondary" onclick="autoLayout()">
+                        <i class="fas fa-magic"></i> Auto Layout
+                    </button>
+
+                </div>
+                <div>
+                    <button class="btn btn-secondary" onclick="newWorkflow()">
+                        <i class="fas fa-file"></i> New
+                    </button>
+                    <button class="btn btn-secondary" onclick="loadWorkflow()">
+                        <i class="fas fa-folder-open"></i> Load
+                    </button>
+                    <button class="btn btn-secondary" onclick="deleteSelectedEdge()" id="delete-edge-btn" style="display: none;">
+                        <i class="fas fa-trash"></i> Delete Edge
+                    </button>
+                    <button class="btn btn-secondary" onclick="deleteSelectedNode()" id="delete-node-btn" style="display: none;">
+                        <i class="fas fa-trash-alt"></i> Delete Node
+                    </button>
+                </div>
+            </div>
+            <div class="canvas" id="canvas">
+                <div style="text-align: center; padding: 50px; color: #666;" id="canvas-empty-state">
+                    <i class="fas fa-project-diagram fa-3x"></i>
+                    <p>Drag nodes from sidebar to start building</p>
+                    <p style="font-size: 12px; margin-top: 10px;">Double-click nodes to edit their code</p>
+                    <p style="font-size: 12px;">Click "Connect Nodes" to create connections between nodes</p>
+                </div>
+                <svg id="edges-container" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1;"></svg>
+            </div>
+            <div class="log-panel" id="log-panel">
+                <div>System ready. Drag nodes to create workflow.</div>
+                <div>Double-click any node to edit its Python code.</div>
+                <div>Click "Connect Nodes" to create connections between nodes.</div>
+                <div>Click "Set Initial Data" to define initial state for execution.</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Code Editor Modal -->
+    <div class="modal" id="code-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modal-title">Edit Node Code</h3>
+                <button class="btn btn-secondary" onclick="closeModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="tab-container" id="modal-tab-container">
+                    <div class="tab active" id="tab-btn-code" onclick="switchTab('code')">Code</div>
+                    <div class="tab" id="tab-btn-llm-prompt" onclick="switchTab('llm-prompt')" style="display:none;">Prompt</div>
+                    <div class="tab" id="tab-btn-spec" onclick="switchTab('spec')">Spec</div>
+                    <div class="tab" id="tab-btn-params" onclick="switchTab('params')">Parameters</div>
+                    <div class="tab" id="tab-btn-templates" onclick="switchTab('templates')">Templates</div>
+                    <div class="tab" id="tab-btn-properties" onclick="switchTab('properties')">Properties</div>
+                </div>
+
+                <div id="code-tab" class="tab-content active">
+                    <textarea class="code-editor" id="code-editor" spellcheck="false" placeholder="Write your Python code here..."></textarea>
+                    <div style="margin-top: 15px; font-size: 12px; color: #666;">
+                        <p><strong>Node must implement:</strong></p>
+                        <pre style="background: #f0f0f0; padding: 10px; border-radius: 4px; font-size: 11px;">
+# Node function signature
+def process(state, params=None):
+    """
+    state: dict - contains data from previous nodes
+    params: dict - node parameters (optional)
+    Returns: dict - modified state
+    """
+    # Your logic here
+    # Access input: state.get('input_data')
+    # Add output: state['output_data'] = processed_value
+    return state</pre>
+                        <p><strong>Important:</strong> Your function MUST return the modified state dictionary.</p>
+                    </div>
+                </div>
+
+                <div id="llm-prompt-tab" class="tab-content">
+                    <div style="margin-bottom:12px;">
+                        <label style="display:block;font-size:13px;font-weight:600;margin-bottom:6px;">System Prompt</label>
+                        <textarea id="llm-system-prompt" placeholder="Describe what this LLM node should do. This becomes the system prompt at runtime." style="width:100%;height:150px;padding:10px;border:1px solid #ddd;border-radius:4px;font-size:13px;resize:vertical;font-family:inherit;line-height:1.5;"></textarea>
+                    </div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+                        <div><label style="display:block;font-size:13px;font-weight:600;margin-bottom:4px;">Model</label>
+                            <select id="llm-model" style="width:100%;padding:6px 10px;border:1px solid #ddd;border-radius:4px;font-size:13px;">
+                                <option value="claude-sonnet-4-20250514">Claude Sonnet 4</option>
+                                <option value="claude-opus-4-20250514">Claude Opus 4</option>
+                                <option value="claude-haiku-4-5-20251001">Claude Haiku</option>
+                                <option value="gpt-4o">GPT-4o</option>
+                                <option value="gpt-4o-mini">GPT-4o Mini</option>
+                                <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
+                            </select></div>
+                        <div><label style="display:block;font-size:13px;font-weight:600;margin-bottom:4px;">Temperature</label>
+                            <input type="number" id="llm-temperature" value="0.7" min="0" max="2" step="0.1" style="width:100%;padding:6px 10px;border:1px solid #ddd;border-radius:4px;font-size:13px;"></div>
+                    </div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                        <div><label style="display:block;font-size:13px;font-weight:600;margin-bottom:4px;">Input Key</label>
+                            <input type="text" id="llm-input-key" placeholder="e.g. smiles, text" style="width:100%;padding:6px 10px;border:1px solid #ddd;border-radius:4px;font-size:13px;"></div>
+                        <div><label style="display:block;font-size:13px;font-weight:600;margin-bottom:4px;">Output Key</label>
+                            <input type="text" id="llm-output-key" placeholder="e.g. prediction, result" style="width:100%;padding:6px 10px;border:1px solid #ddd;border-radius:4px;font-size:13px;"></div>
+                    </div>
+                    <p style="font-size:11px;color:#999;margin-top:12px;"><i class="fas fa-info-circle"></i> Saved into JSON. No tokens consumed until runtime.</p>
+                </div>
+                <div id="spec-tab" class="tab-content">
+                    <div style="margin-bottom:14px;">
+                        <label style="display:block;font-size:13px;font-weight:600;margin-bottom:6px;">Description / Notes</label>
+                        <textarea id="spec-description" placeholder="Describe what this node does..." style="width:100%;height:100px;padding:8px 10px;border:1px solid #ddd;border-radius:4px;font-size:13px;resize:vertical;font-family:inherit;"></textarea>
+                    </div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+                        <div><label style="display:block;font-size:13px;font-weight:600;margin-bottom:4px;">Input Key</label>
+                            <input type="text" id="spec-input-key" placeholder="e.g. image, data" style="width:100%;padding:6px 10px;border:1px solid #ddd;border-radius:4px;font-size:13px;"></div>
+                        <div><label style="display:block;font-size:13px;font-weight:600;margin-bottom:4px;">Output Key</label>
+                            <input type="text" id="spec-output-key" placeholder="e.g. features, result" style="width:100%;padding:6px 10px;border:1px solid #ddd;border-radius:4px;font-size:13px;"></div>
+                    </div>
+                    <div><label style="display:block;font-size:13px;font-weight:600;margin-bottom:4px;">Timeout (s)</label>
+                        <input type="number" id="spec-timeout" value="30" min="1" max="3600" style="width:120px;padding:6px 10px;border:1px solid #ddd;border-radius:4px;font-size:13px;"></div>
+                </div>
+                <div id="params-tab" class="tab-content">
+                    <div id="params-container">
+                        <div class="param-row">
+                            <label>Input Key:</label>
+                            <input type="text" id="input-key" placeholder="e.g., 'input_data'">
+                        </div>
+                        <div class="param-row">
+                            <label>Output Key:</label>
+                            <input type="text" id="output-key" placeholder="e.g., 'output_data'">
+                        </div>
+                        <div class="param-row">
+                            <label>Timeout (seconds):</label>
+                            <input type="number" id="timeout" value="10" min="1" max="300">
+                        </div>
+                        <button class="btn btn-sm btn-primary" onclick="applyParams()">Apply Parameters</button>
+                    </div>
+                </div>
+
+                <div id="templates-tab" class="tab-content">
+                    <select class="template-selector" id="template-selector" onchange="loadTemplate()">
+                        <option value="">Select a template...</option>
+                        <option value="simple_transform">Simple Data Transformation</option>
+                        <option value="text_processor">Text Processor</option>
+                        <option value="math_operation">Math Operation</option>
+                        <option value="list_processor">List Processor</option>
+                        <option value="http_request">HTTP Request</option>
+                    </select>
+                    <div id="template-preview" style="background: #f0f0f0; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 12px; min-height: 200px;">
+                        <!-- Template preview will appear here -->
+                    </div>
+                </div>
+
+                <div id="properties-tab" class="tab-content">
+                    <div style="margin-bottom: 20px;">
+                        <h4>Node Properties</h4>
+                        <div class="node-props">
+                            <div class="node-prop">
+                                <label>Node Name:</label>
+                                <input type="text" id="node-display-name" placeholder="Enter node display name">
+                            </div>
+                            <div class="node-prop">
+                                <label>Node Type:</label>
+                                <select id="node-type-select">
+                                    <option value="custom">Custom</option>
+                                    <option value="start">Start</option>
+                                    <option value="end">End</option>
+                                    <option value="langgraph">LangGraph</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="node-props">
+                            <div class="node-prop">
+                                <label>Icon:</label>
+                                <select id="node-icon-select">
+                                    <option value="plus">Plus</option>
+                                    <option value="play">Play</option>
+                                    <option value="stop">Stop</option>
+                                    <option value="code">Code</option>
+                                    <option value="cog">Cog</option>
+                                    <option value="filter">Filter</option>
+                                    <option value="database">Database</option>
+                                    <option value="cloud">Cloud</option>
+                                </select>
+                            </div>
+                            <div class="node-prop">
+                                <label>Color:</label>
+                                <select id="node-color-select">
+                                    <option value="#F59E0B">Orange</option>
+                                    <option value="#3B82F6">Blue</option>
+                                    <option value="#10B981">Green</option>
+                                    <option value="#EF4444">Red</option>
+                                    <option value="#8B5CF6">Purple</option>
+                                    <option value="#06B6D4">Cyan</option>
+                                    <option value="#667eea">Indigo</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="param-row">
+                            <label>Node ID (read-only):</label>
+                            <input type="text" id="node-id-display" readonly style="background: #f8f9fa;">
+                        </div>
+                        <button class="btn btn-sm btn-primary" onclick="applyNodeProperties()">Apply Properties</button>
+                    </div>
+                </div>
+            </div>
+            <div style="padding: 20px; border-top: 1px solid #ddd; text-align: right;">
+                <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+                <button class="btn btn-success" onclick="saveNodeCode()">Save & Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Initial Data Modal -->
+    <div class="modal" id="initial-data-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Set Initial State Data</h3>
+                <button class="btn btn-secondary" onclick="closeInitialDataModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p>Define the initial state data that will be passed to the first node.</p>
+                <textarea class="code-editor" id="initial-data-editor" style="height: 300px;" spellcheck="false">{
+    "input_data": "Hello, World!",
+    "counter": 0,
+    "items": [],
+    "config": {
+        "debug": false,
+        "max_iterations": 10
+    }
+}</textarea>
+                <p style="font-size: 12px; color: #666; margin-top: 10px;">
+                    <strong>Format:</strong> JSON object that will be passed as the initial state to the workflow.
+                </p>
+            </div>
+            <div style="padding: 20px; border-top: 1px solid #ddd; text-align: right;">
+                <button class="btn btn-secondary" onclick="closeInitialDataModal()">Cancel</button>
+                <button class="btn btn-success" onclick="saveInitialData()">Save Initial Data</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Results Modal -->
+    <div class="modal" id="results-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Execution Results</h3>
+                <button class="btn btn-secondary" onclick="closeResultsModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div id="results-container">
+                    <!-- Results will be displayed here -->
+                </div>
+            </div>
+            <div style="padding: 20px; border-top: 1px solid #ddd; text-align: right;">
+                <button class="btn btn-secondary" onclick="closeResultsModal()">Close</button>
+                <button class="btn btn-primary" onclick="exportResults()">Export Results</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.socket.io/4.6.0/socket.io.min.js"></script>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dagre/0.8.5/dagre.min.js"></script>
+    <script>
+    let workflowNodes = [], workflowEdges = [], selectedNode = null, selectedEdge = null;
+    let socket = null, nodeCounter = 1, edgeCounter = 1;
+    let isConnectingMode = false, connectingFromNode = null, connectingFromPort = null;
+    let currentWorkflowId = null;
+
+    console.log('currentWorkflowId defined:', typeof currentWorkflowId !== 'undefined');
+    console.log('currentWorkflowId value:', currentWorkflowId);
+
+    window.debugVars = function() {
+        return {
+            currentWorkflowId: currentWorkflowId,
+            workflowNodes: workflowNodes,
+            workflowEdges: workflowEdges
+        };
+    };
+
+    let isDraggingNode = false;
+    let dragStartX = 0;
+    let dragStartY = 0;
+    let draggedNode = null;
+    let nodeStartX = 0;
+    let nodeStartY = 0;
+
+    let operationHistory = {
+        undoStack: [],
+        redoStack: [],
+        MAX_STEPS: 50
+    };
+
+    let initialState = {
+        "input_data": "Hello, World!",
+        "counter": 0,
+        "items": [],
+        "config": {
+            "debug": false,
+            "max_iterations": 10
+        }
+    };
+
+    const codeTemplates = {
+        simple_transform: `def process(state, params=None):
+    """
+    Simple data transformation node.
+    Access input from state, process, and return modified state.
+    """
+    # Get input data from state
+    input_data = state.get('input_data', '')
+
+    # Perform transformation
+    if isinstance(input_data, str):
+        processed = input_data.upper()
+    else:
+        processed = str(input_data)
+
+    # Update state with output
+    state['output_data'] = processed
+    state['processed_at'] = new Date().isoformat()
+
+    # Log for debugging
+    print(f"Processed data: {processed}")
+
+    return state`,
+
+        text_processor: `def process(state, params=None):
+    """
+    Text processing node with parameters.
+    params should contain: {'operation': 'reverse|split|count'}
+    """
+    # Get input text
+    text = state.get('text', state.get('input_data', ''))
+
+    # Get parameters
+    operation = 'reverse'
+    if params:
+        operation = params.get('operation', 'reverse')
+
+    # Perform operation
+    if operation == 'reverse':
+        result = text[::-1]
+    elif operation == 'split':
+        result = text.split()
+    elif operation == 'count':
+        result = len(text)
+    elif operation == 'uppercase':
+        result = text.upper()
+    elif operation == 'lowercase':
+        result = text.lower()
+    else:
+        result = f"Unknown operation: {operation}"
+
+    # Update state
+    state['processed_text'] = result
+    state['operation'] = operation
+
+    return state`,
+
+        math_operation: `def process(state, params=None):
+    """
+    Mathematical operation node.
+    Expects: state['numbers'] = [1, 2, 3, ...]
+    """
+    # Get numbers from state
+    numbers = state.get('numbers', [])
+
+    # Get operation from params or default
+    operation = 'sum'
+    if params:
+        operation = params.get('operation', 'sum')
+
+    # Perform calculation
+    result = None
+    if operation == 'sum':
+        result = sum(numbers)
+    elif operation == 'average':
+        result = sum(numbers) / len(numbers) if numbers else 0
+    elif operation == 'max':
+        result = max(numbers) if numbers else 0
+    elif operation == 'min':
+        result = min(numbers) if numbers else 0
+    elif operation == 'product':
+        import math
+        result = math.prod(numbers) if numbers else 0
+
+    # Update state
+    state['calculation_result'] = result
+    state['calculation_type'] = operation
+
+    return state`,
+
+        list_processor: `def process(state, params=None):
+    """
+    List processing node with filtering/mapping.
+    """
+    # Get list from state
+    items = state.get('items', [])
+
+    # Get parameters
+    filter_condition = None
+    map_function = None
+
+    if params:
+        filter_condition = params.get('filter')
+        map_function = params.get('map')
+
+    # Process list
+    processed = items
+
+    # Apply filter if specified
+    if filter_condition:
+        try:
+            processed = [item for item in processed if item > 0]
+        except:
+            pass
+
+    # Apply map if specified
+    if map_function == 'double':
+        processed = [item * 2 for item in processed]
+    elif map_function == 'square':
+        processed = [item ** 2 for item in processed]
+    elif map_function == 'stringify':
+        processed = [str(item) for item in processed]
+
+    # Update state
+    state['processed_items'] = processed
+    state['original_count'] = len(items)
+    state['processed_count'] = len(processed)
+
+    return state`,
+
+        http_request: `def process(state, params=None):
+    """
+    HTTP request node (simplified).
+    In production, you'd use requests library.
+    """
+    import json
+    import urllib.request
+
+    # Get URL from params or state
+    url = ''
+    if params:
+        url = params.get('url', '')
+    if not url:
+        url = state.get('api_url', 'https://jsonplaceholder.typicode.com/todos/1')
+
+    # Make request (simplified for demo)
+    try:
+        data = {
+            "userId": 1,
+            "id": 1,
+            "title": "delectus aut autem",
+            "completed": False,
+            "url": url,
+            "status": "success"
+        }
+
+        # Update state
+        state['api_response'] = data
+        state['request_url'] = url
+        state['request_success'] = true
+
+    } catch (Exception as e) {
+        state['api_error'] = str(e)
+        state['request_success'] = false
+
+    return state`
+    };
+
+    window.onload = function() {
+        loadNodes();
+        connectWebSocket();
+        setupDragAndDrop();
+        updateNodeCountDisplay();
+        updateEdgeCountDisplay();
+        updateUndoRedoButtons();
+    };
+
+    function createNewNode(nodeClass) {
+        nodeClass = nodeClass || 'code';
+        const isLLM = nodeClass === 'llm';
+        const newNodeId   = `node_${Date.now()}`;
+        const defaultName = isLLM ? `LLM ${Date.now().toString().slice(-4)}` : `Code ${Date.now().toString().slice(-4)}`;
+        const icon  = isLLM ? 'magic' : 'code';
+        const color = isLLM ? '#F59E0B' : '#3B82F6';
+        const nodeItem = document.createElement('div');
+        nodeItem.className = 'node-item';
+        nodeItem.setAttribute('data-type', 'custom');
+        nodeItem.setAttribute('data-id', newNodeId);
+        nodeItem.setAttribute('data-node-class', nodeClass);
+        nodeItem.draggable = true;
+        nodeItem.innerHTML = `
+            <i class="fas fa-${icon}" style="color:${color};"></i>
+            <span style="margin-left:8px;flex-grow:1;">${defaultName}</span>
+            <div style="display:flex;gap:4px;">
+                <button class="btn btn-sm btn-secondary" onclick="editCustomNode('${newNodeId}', event)" style="padding:2px 6px;font-size:10px;"><i class="fas fa-edit"></i></button>
+                <button onclick="deleteCustomNodeFromSidebar('${newNodeId}', event)" style="padding:2px 6px;font-size:10px;background:#EF4444;color:white;border:none;border-radius:3px;cursor:pointer;"><i class="fas fa-trash"></i></button>
+            </div>`;
+        const target = document.getElementById(isLLM ? 'llm-nodes-list' : 'code-nodes-list');
+        if (target) target.appendChild(nodeItem);
+        updateNodeClassCounts();
+        setupDragAndDropForNode(nodeItem);
+        saveCustomNodeToStorage(newNodeId, defaultName, true, nodeClass);
+        log(`Created ${nodeClass} node: ${defaultName}`, 'log-ok');
+    }
+    function updateNodeClassCounts() {
+        const total = (document.querySelectorAll('#code-nodes-list .node-item').length)
+                    + (document.querySelectorAll('#llm-nodes-list .node-item').length);
+        const el = document.getElementById('your-nodes-count');
+        if (el) el.textContent = total;
+    }
+
+    function setupDragAndDropForNode(nodeElement) {
+        nodeElement.addEventListener('dragstart', function(e) {
+            e.dataTransfer.setData('nodeType', this.dataset.type || 'custom');
+            e.dataTransfer.setData('nodeId', this.dataset.id);
+            e.dataTransfer.setData('source', 'sidebar');
+        });
+    }
+
+    function editCustomNode(nodeId, event) {
+        if (event) event.stopPropagation();
+
+        const customNodes = JSON.parse(localStorage.getItem('customNodes') || '[]');
+        const node = customNodes.find(n => n.id === nodeId);
+
+        document.getElementById('modal-title').textContent = `Edit Node: ${node ? node.name : nodeId}`;
+
+        if (node && node.code) {
+            document.getElementById('code-editor').value = node.code;
+        } else {
+            document.getElementById('code-editor').value = `def process(state, params=None):
+    """
+    Custom node function.
+    Modify this function to implement your logic.
+    """
+    # Get data from state
+    input_data = state.get('input_data', '')
+
+    # Your logic here
+    processed_data = f"Processed: {input_data}"
+
+    # Update state
+    state['output_data'] = processed_data
+
+    return state`;
+        }
+
+        if (node) {
+            document.getElementById('node-display-name').value = node.name || '';
+            document.getElementById('node-type-select').value = node.type || 'custom';
+            document.getElementById('node-icon-select').value = node.icon || 'plus';
+            document.getElementById('node-color-select').value = node.color || '#F59E0B';
+            document.getElementById('node-id-display').value = nodeId;
+        }
+
+        document.getElementById('code-modal').classList.add('active');
+        selectedNode = nodeId;
+        switchTab('code');
+
+        setTimeout(() => {
+            document.getElementById('code-editor').focus();
+        }, 100);
+    }
+
+    function saveCustomNodeToStorage(nodeId, nodeName, isNew = false, nodeClass = 'code') {
+        const existingNodes = JSON.parse(localStorage.getItem('customNodes') || '[]');
+        const nodeIndex = existingNodes.findIndex(n => n.id === nodeId);
+        const isLLM = nodeClass === 'llm';
+        if (nodeIndex === -1 || isNew) {
+            const newNode = {
+                id: nodeId, name: nodeName || `Node ${nodeId.slice(-4)}`,
+                type: 'custom', node_class: nodeClass,
+                icon: isLLM ? 'magic' : 'code', color: isLLM ? '#F59E0B' : '#3B82F6',
+                code: isLLM ? '' : `def process(state, params=None):
+    # Your code here
+    return state`,
+                spec: { description: '', input_key: '', output_key: '', timeout: 30 },
+                llm: isLLM ? { system_prompt: '', model: 'claude-sonnet-4-20250514', temperature: 0.7, input_key: '', output_key: '' } : null,
+                created: new Date().toISOString(), lastModified: new Date().toISOString()
+            };
+            if (nodeIndex !== -1 && !isNew) { existingNodes[nodeIndex] = { ...existingNodes[nodeIndex], ...newNode }; }
+            else { existingNodes.push(newNode); }
+        }
+        localStorage.setItem('customNodes', JSON.stringify(existingNodes));
+    }
+
+    async function loadNodes() {
+        try {
+            const customNodes = JSON.parse(localStorage.getItem('customNodes') || '[]');
+            const codeList = document.getElementById('code-nodes-list');
+            const llmList  = document.getElementById('llm-nodes-list');
+            if (codeList) codeList.innerHTML = '';
+            if (llmList)  llmList.innerHTML  = '';
+            customNodes.forEach(node => {
+                const isLLM = node.node_class === 'llm';
+                const icon  = node.icon  || (isLLM ? 'magic' : 'code');
+                const color = node.color || (isLLM ? '#F59E0B' : '#3B82F6');
+                const div = document.createElement('div');
+                div.className = 'node-item';
+                div.setAttribute('data-type', node.type || 'custom');
+                div.setAttribute('data-id', node.id);
+                div.setAttribute('data-node-class', node.node_class || 'code');
+                div.draggable = true;
+                div.innerHTML = `
+                    <i class="fas fa-${icon}" style="color:${color};"></i>
+                    <span style="margin-left:8px;flex-grow:1;">${node.name || node.id}</span>
+                    <div style="margin-left:auto;display:flex;gap:4px;">
+                        <button class="btn btn-sm btn-secondary" onclick="editCustomNode('${node.id}', event)" style="padding:2px 6px;font-size:10px;"><i class="fas fa-edit"></i></button>
+                        <button onclick="deleteCustomNodeFromSidebar('${node.id}', event)" style="padding:2px 6px;font-size:10px;background:#fee2e2;color:#ef4444;border:1px solid #fca5a5;border-radius:3px;cursor:pointer;"><i class="fas fa-trash"></i></button>
+                    </div>`;
+                const target = isLLM ? llmList : codeList;
+                if (target) target.appendChild(div);
+            });
+            updateNodeClassCounts();
+            setupDragAndDrop();
+        } catch (error) {
+            console.error('Failed to load nodes:', error);
+            log('Error loading nodes: ' + error.message, 'log-error');
+        }
+    }
+
+    function setupDragAndDrop() {
+        const nodeItems = document.querySelectorAll('.node-item'), canvas = document.getElementById('canvas');
+
+        nodeItems.forEach(item => item.addEventListener('dragstart', function(e) {
+            e.dataTransfer.setData('nodeType', this.dataset.type || 'custom');
+            e.dataTransfer.setData('nodeId', this.dataset.id || 'custom_' + Date.now());
+            e.dataTransfer.setData('source', 'sidebar');
+        }));
+
+        canvas.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            canvas.style.borderColor = '#667eea';
+        });
+
+        canvas.addEventListener('dragleave', function(e) {
+            canvas.style.borderColor = '#ccc';
+        });
+
+        canvas.addEventListener('drop', function(e) {
+            e.preventDefault();
+            canvas.style.borderColor = '#ccc';
+
+            const source = e.dataTransfer.getData('source');
+            const nodeType = e.dataTransfer.getData('nodeType');
+            const nodeId = e.dataTransfer.getData('nodeId');
+
+            if (source === 'sidebar' && nodeId) {
+                addNodeToCanvas(nodeId, nodeType, e.clientX, e.clientY);
+            }
+        });
+    }
+
+    function addNodeToCanvas(nodeId, nodeType, clientX, clientY) {
+        const canvas = document.getElementById('canvas');
+        const rect = canvas.getBoundingClientRect();
+        const x = clientX - rect.left - 60;
+        const y = clientY - rect.top - 30;
+
+        const existingNode = workflowNodes.find(n => n.id === nodeId);
+        if (existingNode) {
+            const nodeElement = document.getElementById(existingNode.elementId);
+            if (nodeElement) {
+                nodeElement.style.left = x + 'px';
+                nodeElement.style.top = y + 'px';
+                existingNode.x = x;
+                existingNode.y = y;
+                updateAllEdges();
+                log(`Moved existing node: ${existingNode.name || nodeId} to (${x}, ${y})`);
+            }
+            return existingNode;
+        }
+
+        const nodeElement = document.createElement('div');
+        nodeElement.className = `canvas-node ${nodeType}`;
+        nodeElement.id = `canvas-${nodeId}-${nodeCounter++}`;
+        nodeElement.dataset.nodeId = nodeId;
+        nodeElement.style.left = x + 'px';
+        nodeElement.style.top = y + 'px';
+
+        let nodeName, nodeIcon, nodeColor;
+
+        if (nodeId === 'start') {
+            nodeName = 'Start';
+            nodeIcon = 'play';
+            nodeColor = '#10B981';
+        } else if (nodeId === 'end') {
+            nodeName = 'End';
+            nodeIcon = 'stop';
+            nodeColor = '#EF4444';
+        } else if (nodeId === 'custom') {
+            nodeName = 'Custom Node';
+            nodeIcon = 'plus';
+            nodeColor = '#F59E0B';
+        } else {
+            const customNodes = JSON.parse(localStorage.getItem('customNodes') || '[]');
+            const nodeInfo = customNodes.find(n => n.id === nodeId);
+
+            if (nodeInfo) {
+                nodeName = nodeInfo.name || `Node ${nodeId.slice(-4)}`;
+                nodeIcon = nodeInfo.icon || 'plus';
+                nodeColor = nodeInfo.color || '#F59E0B';
+            } else {
+                nodeName = `Node ${nodeId.slice(-4)}`;
+                nodeIcon = 'plus';
+                nodeColor = '#F59E0B';
+                saveCustomNodeToStorage(nodeId, nodeName, true);
+            }
+        }
+
+        let inputPort = '', outputPort = '';
+        if (nodeId === 'start') {
+<!--            outputPort = '<div class="port output" data-port-type="output"><div class="port-tooltip">Output</div></div>';-->
+<!--            inputPort = '<div class="port" style="visibility: hidden;"></div>';-->
+            // Start 只有输出
+                outputPort = '<div class="port output" data-port-type="output"><div class="port-tooltip">Output</div></div>';
+                inputPort = '<div class="port" style="visibility: hidden;"></div>'; // 占位，保持 UI 对齐
+        } else if (nodeId === 'end') {
+<!--            inputPort = '<div class="port input" data-port-type="input"><div class="port-tooltip">Input</div></div>';-->
+<!--            outputPort = '<div class="port" style="visibility: hidden;"></div>';-->
+                inputPort = '<div class="port input" data-port-type="input"><div class="port-tooltip">Input</div></div>';
+                outputPort = '<div class="port" style="visibility: hidden;"></div>'; // 占位
+        } else {
+            inputPort = '<div class="port input" data-port-type="input"><div class="port-tooltip">Input</div></div>';
+            outputPort = '<div class="port output" data-port-type="output"><div class="port-tooltip">Output</div></div>';
+        }
+
+        nodeElement.innerHTML = `
+            <div style="position: relative; height: 100%;">
+                <div><i class="fas fa-${nodeIcon}" style="color: ${nodeColor}; font-size: 24px;"></i></div>
+                <div style="margin-top: 8px; font-size: 12px; font-weight: 600; color: #333;">${nodeName}</div>
+                <div style="font-size: 9px; color: #999; margin-top: 2px; opacity: 0.7;">ID: ${nodeId}</div>
+                <div class="node-ports">
+                    ${inputPort}
+                    <div style="font-size: 8px; color: #999; margin-top: 3px;">${nodeType}</div>
+                    ${outputPort}
+                </div>
+            </div>
+        `;
+
+        nodeElement.addEventListener('mousedown', function(e) {
+            if (e.target.closest('.port')) return;
+
+            isDraggingNode = true;
+            draggedNode = this;
+            dragStartX = e.clientX;
+            dragStartY = e.clientY;
+
+            const nodeObj = workflowNodes.find(n => n.elementId === this.id);
+            if (nodeObj) {
+                nodeStartX = nodeObj.x;
+                nodeStartY = nodeObj.y;
+            }
+
+            this.style.zIndex = 1000;
+            document.body.style.cursor = 'grabbing';
+            document.body.style.userSelect = 'none';
+
+            e.stopPropagation();
+            e.preventDefault();
+        });
+
+        document.addEventListener('mousemove', function(e) {
+            if (!isDraggingNode || !draggedNode) return;
+
+            const canvas = document.getElementById('canvas');
+            const canvasRect = canvas.getBoundingClientRect();
+
+            const deltaX = e.clientX - dragStartX;
+            const deltaY = e.clientY - dragStartY;
+
+            let newX = nodeStartX + deltaX;
+            let newY = nodeStartY + deltaY;
+
+            const nodeWidth = 120;
+            const nodeHeight = 80;
+            newX = Math.max(0, Math.min(newX, canvasRect.width - nodeWidth));
+            newY = Math.max(0, Math.min(newY, canvasRect.height - nodeHeight));
+
+            draggedNode.style.left = newX + 'px';
+            draggedNode.style.top = newY + 'px';
+
+            const nodeObj = workflowNodes.find(n => n.elementId === draggedNode.id);
+            if (nodeObj) {
+                nodeObj.x = newX;
+                nodeObj.y = newY;
+            }
+
+            updateAllEdges();
+        });
+
+        document.addEventListener('mouseup', function(e) {
+            if (!isDraggingNode || !draggedNode) return;
+
+            isDraggingNode = false;
+
+            const nodeObj = workflowNodes.find(n => n.elementId === draggedNode.id);
+            if (nodeObj) {
+                const oldX = nodeStartX;
+                const oldY = nodeStartY;
+                const newX = nodeObj.x;
+                const newY = nodeObj.y;
+
+                if (oldX !== newX || oldY !== newY) {
+                    recordOperation({
+                        type: 'move_node',
+                        data: {
+                            nodeId: nodeObj.id,
+                            oldX: oldX,
+                            oldY: oldY,
+                            newX: newX,
+                            newY: newY,
+                            elementId: nodeObj.elementId,
+                            name: nodeObj.name,
+                            icon: nodeObj.icon,
+                            color: nodeObj.color,
+                            type: nodeObj.type
+                        },
+                        timestamp: new Date().toISOString()
+                    });
+                }
+            }
+
+            draggedNode.style.zIndex = 10;
+
+            document.body.style.cursor = '';
+            document.body.style.userSelect = '';
+
+            draggedNode = null;
+
+            updateAllEdges();
+        });
+
+        nodeElement.addEventListener('dblclick', function(e) {
+            e.stopPropagation();
+            editNodeCode(nodeId);
+        });
+
+        nodeElement.addEventListener('click', function(e) {
+            e.stopPropagation();
+            selectNode(this);
+        });
+
+        const inputPortEl = nodeElement.querySelector('.port.input');
+        const outputPortEl = nodeElement.querySelector('.port.output');
+
+        if (inputPortEl) {
+            inputPortEl.addEventListener('click', function(e) {
+                e.stopPropagation();
+                handlePortClick(nodeId, 'input', this);
+            });
+        }
+
+        if (outputPortEl) {
+            outputPortEl.addEventListener('click', function(e) {
+                e.stopPropagation();
+                handlePortClick(nodeId, 'output', this);
+            });
+        }
+
+        canvas.appendChild(nodeElement);
+        const emptyState = document.getElementById('canvas-empty-state');
+        if (emptyState) emptyState.style.display = 'none';
+
+        const nodeObj = {
+            id: nodeId,
+            type: nodeType,
+            x: x,
+            y: y,
+            name: nodeName,
+            icon: nodeIcon,
+            color: nodeColor,
+            elementId: nodeElement.id
+        };
+
+        workflowNodes.push(nodeObj);
+
+        updateNodeCountDisplay();
+        log(`Added node to canvas: ${nodeName} (ID: ${nodeId})`);
+
+        recordOperation({
+            type: 'add_node',
+            data: JSON.parse(JSON.stringify(nodeObj)),
+            timestamp: new Date().toISOString()
+        });
+
+        return nodeObj;
+    }
+
+    function selectNode(nodeElement) {
+        document.querySelectorAll('.canvas-node').forEach(node => {
+            const nodeId = node.dataset.nodeId;
+            const nodeObj = workflowNodes.find(n => n.elementId === node.id);
+            if (nodeObj) {
+                node.style.borderColor = nodeObj.color || getNodeColor(nodeId);
+            } else {
+                node.style.borderColor = getNodeColor(nodeId);
+            }
+            node.style.boxShadow = '0 2px 8px rgba(0,0,0,0.1)';
+        });
+
+        nodeElement.style.borderColor = '#EF4444';
+        nodeElement.style.boxShadow = '0 0 0 3px rgba(239,68,68,0.3)';
+
+        selectedNode = nodeElement.id;
+        document.getElementById('delete-node-btn').style.display = 'inline-flex';
+
+        log(`Selected node: ${selectedNode}`);
+    }
+
+    // --- 新增：删除画布上的节点 ---
+function deleteSelectedNode() {
+    if (!selectedNode) {
+        alert("Please select a node on the canvas first.");
+        return;
+    }
+
+    if (!confirm('Are you sure you want to delete this node and all its connections?')) return;
+
+    // 1. 获取该节点对象
+    const nodeObj = workflowNodes.find(n => n.elementId === selectedNode);
+    if (!nodeObj) return;
+
+    // 2. 记录操作历史（用于 Undo）
+    recordOperation({
+        type: 'delete_node',
+        data: JSON.parse(JSON.stringify(nodeObj)),
+        timestamp: new Date().toISOString()
+    });
+
+    // 3. 核心：删除与该节点关联的所有连线 (Edges)
+    const edgesToDelete = workflowEdges.filter(e => e.source === nodeObj.id || e.target === nodeObj.id);
+    edgesToDelete.forEach(edge => {
+        const edgeEl = document.getElementById(edge.id);
+        if (edgeEl) edgeEl.remove(); // 从 SVG 中移除
+
+        // 移除对应的 marker (箭头)
+        const marker = document.getElementById(`arrow-${edge.id}`);
+        if (marker) marker.remove();
+    });
+
+    // 更新全局连线数组
+    workflowEdges = workflowEdges.filter(e => e.source !== nodeObj.id && e.target !== nodeObj.id);
+
+    // 4. 从 DOM 中移除节点元素
+    const element = document.getElementById(selectedNode);
+    if (element) element.remove();
+
+    // 5. 从全局节点数组中移除
+    workflowNodes = workflowNodes.filter(n => n.elementId !== selectedNode);
+
+    // 6. 重置状态
+    selectedNode = null;
+    document.getElementById('delete-node-btn').style.display = 'none';
+
+    updateNodeCountDisplay();
+    updateEdgeCountDisplay();
+    log(`Deleted node and its connections: ${nodeObj.name}`);
+}
+
+// --- 新增：删除左侧列表中的自定义节点 ---
+function deleteCustomNodeFromSidebar(nodeId, event) {
+    if (event) event.stopPropagation();
+
+    if (confirm(`确定要从侧边栏及画布中彻底删除 "${nodeId}" 吗？`)) {
+        // --- 第一步：从侧边栏移除按钮 ---
+        const sidebarItem = event.target.closest('.node-item');
+        if (sidebarItem) sidebarItem.remove();
+
+        // --- 第二步：从画布中删除所有实例 (DOM + 内存) ---
+        // 查找所有 ID 匹配或类型匹配的实例
+        const instancesToDelete = workflowNodes.filter(n => n.id === nodeId || n.type === nodeId || n.name === nodeId);
+
+        instancesToDelete.forEach(instance => {
+            // 1. 物理删除所有关联的连线 (SVG Edges)
+            workflowEdges = workflowEdges.filter(edge => {
+                if (edge.source === instance.id || edge.target === instance.id) {
+                    const edgeEl = document.getElementById(edge.id);
+                    if (edgeEl) edgeEl.remove(); // 物理删除线
+                    const marker = document.getElementById(`arrow-${edge.id}`);
+                    if (marker) marker.remove(); // 物理删除箭头
+                    return false;
+                }
+                return true;
+            });
+
+            // 2. 物理删除节点本身的 DOM
+            // 先尝试 ID，再尝试 elementId
+            const nodeEl = document.getElementById(instance.id) || document.getElementById(instance.elementId);
+            if (nodeEl) {
+                nodeEl.remove();
+                console.log("Canvas element removed:", instance.id);
+            }
+        });
+
+        // --- 第三步：从内存数组中剔除节点数据 ---
+        workflowNodes = workflowNodes.filter(n => n.id !== nodeId && n.type !== nodeId && n.name !== nodeId);
+
+        // --- 第四步：重置状态 ---
+        if (typeof cancelConnectMode === 'function') cancelConnectMode(); // 强制取消连线状态
+        updateNodeCountDisplay(); // 更新 0 nodes 显示
+        updateEdgeCountDisplay(); // 更新 0 edges 显示
+
+        log(`Global delete successful: ${nodeId}`);
+    }
+}
+
+function deleteAllNodes() {
+    const yourNodesDiv = document.getElementById('your-nodes');
+    const count = yourNodesDiv.querySelectorAll('.node-item').length;
+
+    if (count === 0) { log('No nodes to delete.'); return; }
+
+    if (!confirm(`Delete all ${count} node(s) from the sidebar and canvas?`)) return;
+
+    const nodeItems = yourNodesDiv.querySelectorAll('.node-item');
+    const idsToDelete = Array.from(nodeItems).map(item => item.getAttribute('data-id')).filter(Boolean);
+
+    idsToDelete.forEach(nodeId => {
+        const instancesToDelete = workflowNodes.filter(n => n.id === nodeId || n.type === nodeId);
+        instancesToDelete.forEach(instance => {
+            workflowEdges = workflowEdges.filter(edge => {
+                if (edge.source === instance.id || edge.target === instance.id) {
+                    const edgeEl = document.getElementById(edge.id);
+                    if (edgeEl) edgeEl.remove();
+                    const marker = document.getElementById(`arrow-${edge.id}`);
+                    if (marker) marker.remove();
+                    return false;
+                }
+                return true;
+            });
+            const nodeEl = document.getElementById(instance.id) || document.getElementById(instance.elementId);
+            if (nodeEl) nodeEl.remove();
+        });
+        workflowNodes = workflowNodes.filter(n => n.id !== nodeId && n.type !== nodeId);
+    });
+
+    localStorage.removeItem('customNodes');
+    yourNodesDiv.innerHTML = '<div style="text-align: center; padding: 20px; color: #666; font-size: 14px;">No nodes yet. Click "New Node" to create one.</div>';
+    document.getElementById('your-nodes-count').textContent = '0';
+
+    if (typeof cancelConnectMode === 'function') cancelConnectMode();
+    updateNodeCountDisplay();
+    updateEdgeCountDisplay();
+    log(`Deleted all ${count} node(s) from sidebar and canvas.`);
+}
+
+    function getNodeColor(nodeId) {
+        const node = workflowNodes.find(n => n.id === nodeId);
+        if (node) return node.color || '#667eea';
+
+        if (nodeId === 'start') return '#10B981';
+        if (nodeId === 'end') return '#EF4444';
+        return '#667eea';
+    }
+
+    /**
+ * 处理端口点击：建立或销毁连接
+ */
+function handlePortClick(nodeId, portType, portElement) {
+    if (!isConnectingMode) {
+        log(`Click the "Connect Nodes" button first to create connections`);
+        return;
+    }
+
+    if (!connectingFromNode) {
+        // 记录起点
+        connectingFromNode = nodeId;
+        connectingFromPort = portType;
+        portElement.style.backgroundColor = '#F59E0B'; // 选中高亮
+        log(`Starting connection from ${nodeId} (${portType}) - Now click target port`);
+    } else {
+        // 防止自连
+        if (connectingFromNode === nodeId) {
+            log(`Cannot connect a node to itself`);
+            resetConnectingMode();
+            return;
+        }
+
+        // 确定 Source 和 Target (必须是 Output -> Input)
+        let sourceNodeId, targetNodeId;
+        if (connectingFromPort === 'output' && portType === 'input') {
+            sourceNodeId = connectingFromNode;
+            targetNodeId = nodeId;
+        } else if (connectingFromPort === 'input' && portType === 'output') {
+            sourceNodeId = nodeId;
+            targetNodeId = connectingFromNode;
+        } else {
+            log(`Invalid connection: Need Output to Input pair`);
+            resetConnectingMode();
+            return;
+        }
+
+        // --- 核心：判断并销毁 (Kill) 或 建立 (Create) ---
+        const existingEdgeIndex = workflowEdges.findIndex(edge =>
+            edge.source === sourceNodeId && edge.target === targetNodeId
+        );
+
+        if (existingEdgeIndex !== -1) {
+            // A. 执行销毁逻辑 (只杀线，不伤节点)
+            const edgeToDelete = workflowEdges[existingEdgeIndex];
+            if (confirm(`Connection exists. Kill the link from ${sourceNodeId} to ${targetNodeId}?`)) {
+
+                // 1. 从内存数组删除
+                workflowEdges.splice(existingEdgeIndex, 1);
+
+                // 2. 从 DOM 移除连线组 (包含 pathData)
+                const edgeGroup = document.getElementById(edgeToDelete.id);
+                if (edgeGroup) edgeGroup.remove();
+
+                // 3. 移除 SVG 箭头定义 (marker)
+                const marker = document.getElementById(`arrow-${edgeToDelete.id}`);
+                if (marker) marker.remove();
+
+                log(`Successfully killed connection: ${edgeToDelete.id}. Nodes preserved.`);
+                updateEdgeCountDisplay();
+            }
+        } else {
+            // B. 执行创建逻辑
+            createEdge(sourceNodeId, targetNodeId);
+        }
+
+        // 无论何种结果，重置模式
+        resetConnectingMode();
+    }
+}
+
+/**
+ * 重置连接模式：清空状态和 UI 高亮
+ */
+/**
+ * 处理端口点击：建立或销毁连接
+ */
+function handlePortClick(nodeId, portType, portElement) {
+    if (!isConnectingMode) {
+        log(`Click the "Connect Nodes" button first to create connections`);
+        return;
+    }
+
+    if (!connectingFromNode) {
+        // 记录起点
+        connectingFromNode = nodeId;
+        connectingFromPort = portType;
+        portElement.style.backgroundColor = '#F59E0B'; // 选中高亮
+        log(`Starting connection from ${nodeId} (${portType}) - Now click target port`);
+    } else {
+        // 防止自连
+        if (connectingFromNode === nodeId) {
+            log(`Cannot connect a node to itself`);
+            resetConnectingMode();
+            return;
+        }
+
+        // 确定 Source 和 Target (必须是 Output -> Input)
+        let sourceNodeId, targetNodeId;
+        if (connectingFromPort === 'output' && portType === 'input') {
+            sourceNodeId = connectingFromNode;
+            targetNodeId = nodeId;
+        } else if (connectingFromPort === 'input' && portType === 'output') {
+            sourceNodeId = nodeId;
+            targetNodeId = connectingFromNode;
+        } else {
+            log(`Invalid connection: Need Output to Input pair`);
+            resetConnectingMode();
+            return;
+        }
+
+        // --- 核心：判断并销毁 (Kill) 或 建立 (Create) ---
+        const existingEdgeIndex = workflowEdges.findIndex(edge =>
+            edge.source === sourceNodeId && edge.target === targetNodeId
+        );
+
+        if (existingEdgeIndex !== -1) {
+            // A. 执行销毁逻辑 (只杀线，不伤节点)
+            const edgeToDelete = workflowEdges[existingEdgeIndex];
+            if (confirm(`Connection exists. Kill the link from ${sourceNodeId} to ${targetNodeId}?`)) {
+
+                // 1. 从内存数组删除
+                workflowEdges.splice(existingEdgeIndex, 1);
+
+                // 2. 从 DOM 移除连线组 (包含 pathData)
+                const edgeGroup = document.getElementById(edgeToDelete.id);
+                if (edgeGroup) edgeGroup.remove();
+
+                // 3. 移除 SVG 箭头定义 (marker)
+                const marker = document.getElementById(`arrow-${edgeToDelete.id}`);
+                if (marker) marker.remove();
+
+                log(`Successfully killed connection: ${edgeToDelete.id}. Nodes preserved.`);
+                updateEdgeCountDisplay();
+            }
+        } else {
+            // B. 执行创建逻辑
+            createEdge(sourceNodeId, targetNodeId);
+        }
+
+        // 无论何种结果，重置模式
+        resetConnectingMode();
+    }
+}
+
+/**
+ * 重置连接模式：清空状态和 UI 高亮
+ */
+function resetConnectingMode() {
+    isConnectingMode = false;
+    connectingFromNode = null;
+    connectingFromPort = null;
+
+    // 恢复所有端口颜色
+    document.querySelectorAll('.port').forEach(p => {
+        p.style.backgroundColor = '';
+    });
+
+    // 更新左侧面板状态
+    const statusLabel = document.querySelector('.connection-mode-status');
+    if (statusLabel) statusLabel.textContent = 'Normal';
+
+    log("Connection mode deactivated.");
+}
+
+    function createEdge(sourceNodeId, targetNodeId) {
+        console.log('Creating edge from', sourceNodeId, 'to', targetNodeId);
+        const edgeId = `edge-${edgeCounter++}`;
+        const edge = {
+            id: edgeId,
+            source: sourceNodeId,
+            target: targetNodeId,
+            sourcePort: 'output',
+            targetPort: 'input'
+        };
+
+        workflowEdges.push(edge);
+        drawEdge(edge);
+        updateEdgeCountDisplay();
+        log(`Created connection: ${sourceNodeId} → ${targetNodeId}`);
+
+        recordOperation({
+            type: 'add_edge',
+            data: JSON.parse(JSON.stringify(edge)),
+            timestamp: new Date().toISOString()
+        });
+    }
+
+    function drawEdge(edge) {
+        console.log('Drawing edge:', edge);
+
+        const sourceNode = workflowNodes.find(n => n.id === edge.source);
+        const targetNode = workflowNodes.find(n => n.id === edge.target);
+
+        if (!sourceNode || !targetNode) {
+            console.error('Node not found:', edge.source, 'or', edge.target);
+            return;
+        }
+
+        const sourceElement = document.getElementById(sourceNode.elementId);
+        const targetElement = document.getElementById(targetNode.elementId);
+
+        if (!sourceElement || !targetElement) {
+            console.error('Element not found:', sourceNode.elementId, 'or', targetNode.elementId);
+            return;
+        }
+
+        const sourceRect = sourceElement.getBoundingClientRect();
+        const targetRect = targetElement.getBoundingClientRect();
+        const canvasRect = document.getElementById('canvas').getBoundingClientRect();
+
+        const sourceX = sourceRect.left - canvasRect.left + sourceRect.width;
+        const sourceY = sourceRect.top - canvasRect.top + sourceRect.height / 2;
+        const targetX = targetRect.left - canvasRect.left;
+        const targetY = targetRect.top - canvasRect.top + targetRect.height / 2;
+
+        const svgNS = "http://www.w3.org/2000/svg";
+        const edgeGroup = document.createElementNS(svgNS, "g");
+        edgeGroup.id = edge.id;
+        edgeGroup.classList.add('edge');
+
+        const path = document.createElementNS(svgNS, "path");
+        path.classList.add('edge-line');
+
+        const marker = document.createElementNS(svgNS, "marker");
+        marker.id = `arrow-${edge.id}`;
+        marker.setAttribute("markerWidth", "10");
+        marker.setAttribute("markerHeight", "10");
+        marker.setAttribute("refX", "9");
+        marker.setAttribute("refY", "3");
+        marker.setAttribute("orient", "auto");
+        marker.setAttribute("markerUnits", "strokeWidth");
+
+        const arrow = document.createElementNS(svgNS, "path");
+        arrow.setAttribute("d", "M0,0 L0,6 L9,3 z");
+        arrow.classList.add('edge-arrow');
+        marker.appendChild(arrow);
+
+        let defs = document.querySelector('#edges-container defs');
+        if (!defs) {
+            defs = document.createElementNS(svgNS, "defs");
+            document.getElementById('edges-container').appendChild(defs);
+        }
+        defs.appendChild(marker);
+
+        path.setAttribute("marker-end", `url(#arrow-${edge.id})`);
+
+        const controlX1 = sourceX + 50;
+        const controlY1 = sourceY;
+        const controlX2 = targetX - 50;
+        const controlY2 = targetY;
+
+        const pathData = `M ${sourceX} ${sourceY} C ${controlX1} ${controlY1}, ${controlX2} ${controlY2}, ${targetX} ${targetY}`;
+        path.setAttribute("d", pathData);
+
+        edgeGroup.appendChild(path);
+        document.getElementById('edges-container').appendChild(edgeGroup);
+
+<!--        edgeGroup.addEventListener('click', function(e) {-->
+<!--            e.stopPropagation();-->
+<!--            selectEdge(edge.id);-->
+<!--        });-->
+        // 找到这段代码进行修改
+    edgeGroup.addEventListener('click', function(e) {
+        e.stopPropagation();
+
+        // 1. 先执行原有的选中逻辑
+        selectEdge(edge.id);
+
+        // 2. 添加删除逻辑：双击或者弹窗确认
+        if (confirm(`Delete connection: ${edge.source} -> ${edge.target}?`)) {
+            // 从全局数组中移除数据
+            workflowEdges = workflowEdges.filter(ev => ev.id !== edge.id);
+
+            // 从 DOM (界面) 中移除线条
+            this.remove();
+
+            // 移除对应的箭头定义
+            const marker = document.getElementById(`arrow-${edge.id}`);
+            if (marker) marker.remove();
+
+            // 更新日志和计数
+            log(`Deleted connection: ${edge.source} -> ${edge.target}`);
+            updateEdgeCountDisplay();
+
+            // 如果被删除的是当前选中的边，重置变量
+            if (selectedEdge === edge.id) selectedEdge = null;
+        }
+    });
+
+    // 把你的 Cancel 按钮暂时改成“删除特定线”
+function deleteStartToNode4() {
+    const targetNodeId = 'node_1769704453600'; // Node 4 的 ID
+    workflowEdges = workflowEdges.filter(e => !(e.source === 'start' && e.target === targetNodeId));
+
+    // 重新渲染所有线
+    const container = document.getElementById('edges-container');
+    container.innerHTML = '<defs></defs>';
+    workflowEdges.forEach(edge => drawEdge(edge));
+
+    log("Manually removed Start -> Node 4 connection.");
+}
+
+        edge.element = edgeGroup;
+        edge.path = path;
+        edge.sourceElement = sourceElement;
+        edge.targetElement = targetElement;
+    }
+
+
+
+    function selectEdge(edgeId) {
+        document.querySelectorAll('.edge').forEach(edge => edge.classList.remove('selected'));
+
+        const edgeElement = document.getElementById(edgeId);
+        if (edgeElement) {
+            edgeElement.classList.add('selected');
+            selectedEdge = edgeId;
+            document.getElementById('delete-edge-btn').style.display = 'inline-flex';
+            log(`Selected edge: ${edgeId}`);
+        }
+    }
+
+    function deleteSelectedEdge() {
+        if (!selectedEdge) return;
+
+        const edgeIndex = workflowEdges.findIndex(edge => edge.id === selectedEdge);
+        if (edgeIndex !== -1) {
+            const edge = workflowEdges[edgeIndex];
+
+            recordOperation({
+                type: 'delete_edge',
+                data: JSON.parse(JSON.stringify(edge)),
+                timestamp: new Date().toISOString()
+            });
+
+            if (edge.element && edge.element.parentNode) {
+                edge.element.parentNode.removeChild(edge.element);
+            }
+
+            workflowEdges.splice(edgeIndex, 1);
+
+            log(`Deleted edge: ${selectedEdge}`);
+            updateEdgeCountDisplay();
+
+            document.getElementById('delete-edge-btn').style.display = 'none';
+            selectedEdge = null;
+        }
+    }
+
+    function deleteSelectedNode() {
+        if (!selectedNode) return;
+
+        const nodeIndex = workflowNodes.findIndex(
+            n => n.elementId === selectedNode
+        );
+
+        if (nodeIndex === -1) return;
+
+        const node = workflowNodes[nodeIndex];
+
+        recordOperation({
+            type: 'delete_node',
+            data: JSON.parse(JSON.stringify(node)),
+            timestamp: new Date().toISOString()
+        });
+
+        const nodeElement = document.getElementById(node.elementId);
+        if (nodeElement && nodeElement.parentNode) {
+            nodeElement.parentNode.removeChild(nodeElement);
+        }
+
+        const edgesToDelete = workflowEdges.filter(edge =>
+            edge.source === node.id || edge.target === node.id
+        );
+
+        edgesToDelete.forEach(edge => {
+            recordOperation({
+                type: 'delete_edge',
+                data: JSON.parse(JSON.stringify(edge)),
+                timestamp: new Date().toISOString()
+            });
+
+            const edgeElement = document.getElementById(edge.id);
+            if (edgeElement && edgeElement.parentNode) {
+                edgeElement.parentNode.removeChild(edgeElement);
+            }
+        });
+
+        workflowEdges = workflowEdges.filter(edge =>
+            edge.source !== node.id && edge.target !== node.id
+        );
+
+        workflowNodes.splice(nodeIndex, 1);
+
+        updateNodeCountDisplay();
+        updateEdgeCountDisplay();
+
+        if (workflowNodes.length === 0) {
+            document.getElementById('canvas-empty-state').style.display = 'block';
+        }
+
+        log(`Deleted node: ${node.id}, removed ${edgesToDelete.length} edges`);
+
+        document.getElementById('delete-node-btn').style.display = 'none';
+        selectedNode = null;
+    }
+
+    function startConnectMode() {
+        isConnectingMode = true;
+        connectingFromNode = null;
+        connectingFromPort = null;
+
+        document.getElementById('mode-indicator').textContent = 'Connecting';
+        document.getElementById('mode-indicator').classList.add('mode-connecting');
+
+        log('Connection mode active. Click output port, then input port to connect nodes.');
+    }
+
+    function cancelConnectMode() {
+        resetConnectingMode();
+        log('Connection mode cancelled.');
+    }
+
+
+    // 1. 定义取消连接的函数
+function resetConnectingMode() {
+    isConnectingMode = false;
+
+    // 如果之前点击了某个端口，把它颜色变回原来的样子
+    if (connectingFromNode && connectingFromPort) {
+        log(`Connection mode cancelled.`);
+    }
+
+    // 核心：重置所有连接相关的状态变量
+    connectingFromNode = null;
+    connectingFromPort = null;
+
+    // UI 反馈：恢复端口颜色
+    document.querySelectorAll('.port').forEach(p => {
+        p.style.backgroundColor = '';
+    });
+
+    // 更新控制台日志
+    log("Connection mode deactivated.");
+}
+
+// 2. 确保你的按钮绑定了这个函数
+// 在 HTML 中找到 Cancel Connection 按钮，修改为：
+// <button class="btn btn-danger" onclick="resetConnectingMode()">
+//    <i class="fas fa-times"></i> Cancel Connection
+// </button>
+
+    function updateNodePosition(nodeId, x, y) {
+        const node = workflowNodes.find(n => n.id === nodeId);
+        if (node) { node.x = x; node.y = y; }
+    }
+
+    function updateNodeCountDisplay() {
+        const count = workflowNodes.length;
+        document.getElementById('node-count-display').textContent = `${count} node${count !== 1 ? 's' : ''}`;
+    }
+
+    function updateEdgeCountDisplay() {
+        const count = workflowEdges.length;
+        document.getElementById('edge-count-display').textContent = `${count} connection${count !== 1 ? 's' : ''}`;
+    }
+
+    function switchTab(tabName) {
+        document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+
+        document.querySelector(`.tab[onclick*="${tabName}"]`).classList.add('active');
+        document.getElementById(`${tabName}-tab`).classList.add('active');
+    }
+
+    function loadTemplate() {
+        const templateName = document.getElementById('template-selector').value;
+        if (templateName && codeTemplates[templateName]) {
+            document.getElementById('template-preview').textContent = codeTemplates[templateName];
+        }
+    }
+
+    async function editNodeCode(nodeId) {
+        try {
+            const customNodes = JSON.parse(localStorage.getItem('customNodes') || '[]');
+            const node = customNodes.find(n => n.id === nodeId);
+            if (node) {
+                const isLLM = node.node_class === 'llm';
+                document.getElementById('modal-title').textContent = `Edit ${isLLM ? 'LLM' : 'Code'} Node: ${node.name || nodeId}`;
+                document.getElementById('code-editor').value = node.code || '';
+                document.getElementById('node-display-name').value = node.name || '';
+                document.getElementById('node-type-select').value = node.type || 'custom';
+                document.getElementById('node-icon-select').value = node.icon || (isLLM ? 'magic' : 'code');
+                document.getElementById('node-color-select').value = node.color || (isLLM ? '#F59E0B' : '#3B82F6');
+                document.getElementById('node-id-display').value = nodeId;
+                const spec = node.spec || {};
+                document.getElementById('spec-description').value = spec.description || '';
+                document.getElementById('spec-input-key').value   = spec.input_key   || '';
+                document.getElementById('spec-output-key').value  = spec.output_key  || '';
+                document.getElementById('spec-timeout').value     = spec.timeout     || 30;
+                const llm = node.llm || {};
+                document.getElementById('llm-system-prompt').value = llm.system_prompt || '';
+                document.getElementById('llm-model').value         = llm.model || 'claude-sonnet-4-20250514';
+                document.getElementById('llm-temperature').value   = llm.temperature !== undefined ? llm.temperature : 0.7;
+                document.getElementById('llm-input-key').value     = llm.input_key  || '';
+                document.getElementById('llm-output-key').value    = llm.output_key || '';
+                document.getElementById('tab-btn-code').style.display       = isLLM ? 'none' : '';
+                document.getElementById('tab-btn-templates').style.display  = isLLM ? 'none' : '';
+                document.getElementById('tab-btn-llm-prompt').style.display = isLLM ? '' : 'none';
+                document.getElementById('code-modal').classList.add('active');
+                selectedNode = nodeId;
+                switchTab(isLLM ? 'llm-prompt' : 'code');
+                setTimeout(() => {
+                    document.getElementById('code-editor').focus();
+                    const textarea = document.getElementById('code-editor');
+                    textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+                }, 100);
+            } else {
+                let displayName = nodeId.charAt(0).toUpperCase() + nodeId.slice(1);
+                if (nodeId === 'custom') displayName = 'Custom Node';
+
+                document.getElementById('modal-title').textContent = `Edit Node: ${displayName}`;
+                document.getElementById('code-editor').value = `def process(state, params=None):
+    """
+    ${displayName} node function.
+    Modify this function to implement your logic.
+    """
+    # Your logic here
+    return state`;
+
+                document.getElementById('node-display-name').value = displayName;
+                document.getElementById('node-type-select').value = nodeId;
+                document.getElementById('node-icon-select').value = nodeId === 'start' ? 'play' : nodeId === 'end' ? 'stop' : 'plus';
+                document.getElementById('node-color-select').value = nodeId === 'start' ? '#10B981' : nodeId === 'end' ? '#EF4444' : '#F59E0B';
+                document.getElementById('node-id-display').value = nodeId;
+
+                document.getElementById('code-modal').classList.add('active');
+                selectedNode = nodeId;
+                switchTab('code');
+                setTimeout(() => {
+                    document.getElementById('code-editor').focus();
+                    const textarea = document.getElementById('code-editor');
+                    textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+                }, 100);
+            }
+        } catch (error) {
+            console.error('Failed to load node code:', error);
+            log('Error loading node code: ' + error.message);
+        }
+    }
+
+    function applyParams() {
+        const inputKey = document.getElementById('input-key').value;
+        const outputKey = document.getElementById('output-key').value;
+        const timeout = document.getElementById('timeout').value;
+
+        if (inputKey || outputKey) {
+            let code = document.getElementById('code-editor').value;
+            if (!code.includes('def process')) {
+                code = `def process(state, params=None):
+    # Node: ${selectedNode}
+    # Input key: ${inputKey}
+    # Output key: ${outputKey}
+    # Timeout: ${timeout}s
+
+    # Your logic here
+    return state`;
+            }
+            document.getElementById('code-editor').value = code;
+            log(`Applied parameters to ${selectedNode}`);
+        }
+    }
+
+    function applyNodeProperties() {
+        const nodeName = document.getElementById('node-display-name').value;
+        const nodeType = document.getElementById('node-type-select').value;
+        const nodeIcon = document.getElementById('node-icon-select').value;
+        const nodeColor = document.getElementById('node-color-select').value;
+
+        if (!selectedNode) return;
+
+        const customNodes = JSON.parse(localStorage.getItem('customNodes') || '[]');
+        const nodeIndex = customNodes.findIndex(n => n.id === selectedNode);
+
+        if (nodeIndex !== -1) {
+            customNodes[nodeIndex].name = nodeName || `Node ${selectedNode.slice(-4)}`;
+            customNodes[nodeIndex].type = nodeType;
+            customNodes[nodeIndex].icon = nodeIcon;
+            customNodes[nodeIndex].color = nodeColor;
+            customNodes[nodeIndex].lastModified = new Date().toISOString();
+            localStorage.setItem('customNodes', JSON.stringify(customNodes));
+        } else if (selectedNode.startsWith('node_')) {
+            customNodes.push({
+                id: selectedNode,
+                name: nodeName || `Node ${selectedNode.slice(-4)}`,
+                type: nodeType,
+                icon: nodeIcon,
+                color: nodeColor,
+                code: document.getElementById('code-editor').value || '',
+                created: new Date().toISOString(),
+                lastModified: new Date().toISOString()
+            });
+            localStorage.setItem('customNodes', JSON.stringify(customNodes));
+        }
+
+        const canvasNode = workflowNodes.find(n => n.id === selectedNode);
+        if (canvasNode) {
+            canvasNode.name = nodeName || `Node ${selectedNode.slice(-4)}`;
+            canvasNode.type = nodeType;
+            canvasNode.icon = nodeIcon;
+            canvasNode.color = nodeColor;
+
+            updateCanvasNodeDisplay(canvasNode);
+        }
+
+        loadNodes();
+
+        log(`Updated properties for node: ${nodeName || selectedNode}`);
+    }
+
+    function updateCanvasNodeDisplay(canvasNode) {
+        const nodeElement = document.getElementById(canvasNode.elementId);
+        if (!nodeElement) return;
+
+        const iconElement = nodeElement.querySelector('i');
+        if (iconElement) {
+            iconElement.className = `fas fa-${canvasNode.icon}`;
+            iconElement.style.color = canvasNode.color;
+        }
+
+        const nameElement = nodeElement.querySelector('div[style*="margin-top: 8px"]');
+        if (nameElement) {
+            nameElement.textContent = canvasNode.name || canvasNode.id;
+        }
+
+        const idElement = nodeElement.querySelector('div[style*="font-size: 9px"]');
+        if (idElement) {
+            idElement.textContent = `ID: ${canvasNode.id}`;
+        }
+
+        const typeElement = nodeElement.querySelector('div[style*="font-size: 8px"]');
+        if (typeElement) {
+            typeElement.textContent = canvasNode.type;
+        }
+
+        nodeElement.className = `canvas-node ${canvasNode.type}`;
+    }
+
+    async function saveNodeCode() {
+    // 1. 强制提取字符串 ID，防止对象对比失效
+    const nodeId = (selectedNode && typeof selectedNode === 'object')
+                   ? selectedNode.id
+                   : selectedNode;
+
+    if (!nodeId) {
+        console.error("No node selected for saving.");
+        return;
+    }
+
+    const code = document.getElementById('code-editor').value;
+
+    if (!code.trim()) {
+        alert('Please write some code before saving!');
+        return;
+    }
+
+    try {
+        let customNodes = JSON.parse(localStorage.getItem('customNodes') || '[]');
+
+        // 2. 核心防重：使用 ID 字符串查找
+        const nodeIndex = customNodes.findIndex(n => n.id === nodeId);
+
+        const nodeName  = document.getElementById('node-display-name').value;
+        const nodeType  = document.getElementById('node-type-select').value;
+        const nodeIcon  = document.getElementById('node-icon-select').value;
+        const nodeColor = document.getElementById('node-color-select').value;
+        let allNodes = JSON.parse(localStorage.getItem('customNodes') || '[]');
+        const existingNode = allNodes.find(n => n.id === nodeId) || {};
+        const nodeClass = existingNode.node_class || 'code';
+        const isLLM = nodeClass === 'llm';
+        const nodeSpec = {
+            description: document.getElementById('spec-description').value.trim(),
+            input_key:   document.getElementById('spec-input-key').value.trim(),
+            output_key:  document.getElementById('spec-output-key').value.trim(),
+            timeout:     parseInt(document.getElementById('spec-timeout').value) || 30,
+        };
+        const nodeLLM = isLLM ? {
+            system_prompt: document.getElementById('llm-system-prompt').value.trim(),
+            model:         document.getElementById('llm-model').value,
+            temperature:   parseFloat(document.getElementById('llm-temperature').value) || 0.7,
+            input_key:     document.getElementById('llm-input-key').value.trim(),
+            output_key:    document.getElementById('llm-output-key').value.trim(),
+        } : (existingNode.llm || null);
+        const nodeUpdate = {
+            id: nodeId, name: nodeName || `Node ${nodeId.toString().slice(-4)}`,
+            type: nodeType || 'custom', node_class: nodeClass,
+            icon: nodeIcon || (isLLM ? 'magic' : 'code'),
+            color: nodeColor || (isLLM ? '#F59E0B' : '#3B82F6'),
+            code: code, spec: nodeSpec, llm: nodeLLM,
+            lastModified: new Date().toISOString()
+        };
+
+        if (nodeIndex !== -1) {
+            // A 情况：已存在，则精准覆盖该位置，不增加数组长度
+            customNodes[nodeIndex] = { ...customNodes[nodeIndex], ...nodeUpdate };
+        } else {
+            // B 情况：确认是新 ID，才执行 push
+            nodeUpdate.created = new Date().toISOString();
+            customNodes.push(nodeUpdate);
+        }
+
+        // 保存到本地存储
+        localStorage.setItem('customNodes', JSON.stringify(customNodes));
+
+        // 同步画布 UI
+        const canvasNode = workflowNodes.find(n => n.id === nodeId);
+        if (canvasNode) {
+            canvasNode.name       = nodeUpdate.name;
+            canvasNode.type       = nodeUpdate.type;
+            canvasNode.node_class = nodeUpdate.node_class;
+            canvasNode.icon       = nodeUpdate.icon;
+            canvasNode.color      = nodeUpdate.color;
+            canvasNode.code       = nodeUpdate.code;
+            canvasNode.spec       = nodeUpdate.spec;
+            canvasNode.llm        = nodeUpdate.llm;
+            updateCanvasNodeDisplay(canvasNode);
+        }
+
+        closeModal();
+        log(`Code saved for ${nodeUpdate.name}`);
+
+        // 重新加载侧边栏（loadNodes 内部必须有 innerHTML='' 清空逻辑）
+        loadNodes();
+
+    } catch (error) {
+        console.error('Failed to save code:', error);
+        log('Error saving node code: ' + error.message);
+    }
+}
+
+    function closeModal() {
+        document.getElementById('code-modal').classList.remove('active');
+        selectedNode = null;
+    }
+
+    function showInitialDataModal() {
+        document.getElementById('initial-data-modal').classList.add('active');
+        document.getElementById('initial-data-editor').value = JSON.stringify(initialState, null, 2);
+    }
+
+    function closeInitialDataModal() {
+        document.getElementById('initial-data-modal').classList.remove('active');
+    }
+
+    function saveInitialData() {
+        try {
+            const dataText = document.getElementById('initial-data-editor').value;
+            initialState = JSON.parse(dataText);
+            closeInitialDataModal();
+            log('Initial state data saved');
+        } catch (error) {
+            alert('Invalid JSON format. Please check your data.');
+        }
+    }
+
+    function showResultsModal(results) {
+        console.log('showResultsModal called with:', results);  // Debug line
+
+        const container = document.getElementById('results-container');
+        container.innerHTML = '';
+
+        if (!results) {
+            container.innerHTML = '<p>No results data received</p>';
+            document.getElementById('results-modal').classList.add('active');
+            return;
+        }
+
+        if (results.success) {
+            // Build execution log display
+            let logHTML = '';
+            if (results.execution_log && results.execution_log.length > 0) {
+                logHTML = results.execution_log.map(log => {
+                    let statusColor = log.status === 'completed' ? '#10B981' :
+                                     log.status === 'error' ? '#EF4444' : '#6B7280';
+
+                    return `
+                        <div class="result-item" style="border-left: 3px solid ${statusColor};">
+                            <strong>${log.node}</strong> (${log.status})
+                            <div style="font-size: 11px; color: #666; margin-top: 4px;">
+                                ${log.message || ''}
+                            </div>
+                            ${log.output ? `<pre style="background: #f8f9fa; padding: 8px; margin-top: 4px; border-radius: 4px; font-size: 11px;">${log.output}</pre>` : ''}
+                            ${log.error ? `<pre style="background: #fee2e2; padding: 8px; margin-top: 4px; border-radius: 4px; font-size: 11px; color: #991b1b;">${log.error}</pre>` : ''}
+                        </div>
+                    `;
+                }).join('');
+            }
+
+            // Build final state display
+            const stateHTML = Object.entries(results.final_state || {}).map(([key, value]) => {
+                let displayValue = value;
+                if (typeof value === 'object') {
+                    displayValue = JSON.stringify(value, null, 2);
+                }
+
+                return `
+                    <div class="result-item">
+                        <strong>${key}:</strong>
+                        <pre style="margin: 4px 0 0 0; background: #f8f9fa; padding: 8px; border-radius: 4px; font-size: 11px;">${displayValue}</pre>
+                    </div>
+                `;
+            }).join('');
+
+            container.innerHTML = `
+                <div style="margin-bottom: 20px;">
+                    <h4 style="color: #10B981; margin-bottom: 10px;">
+                        <i class="fas fa-check-circle"></i> Execution Successful!
+                    </h4>
+                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 15px;">
+                        <div style="background: #f0fdf4; padding: 10px; border-radius: 6px; border: 1px solid #86efac;">
+                            <div style="font-size: 11px; color: #166534; font-weight: 600;">Nodes Executed</div>
+                            <div style="font-size: 24px; font-weight: bold; color: #15803d;">${results.nodes_executed || 0}</div>
+                        </div>
+                        <div style="background: #eff6ff; padding: 10px; border-radius: 6px; border: 1px solid #93c5fd;">
+                            <div style="font-size: 11px; color: #1e40af; font-weight: 600;">Execution Time</div>
+                            <div style="font-size: 24px; font-weight: bold; color: #1d4ed8;">${results.execution_time || 'N/A'}</div>
+                        </div>
+                        <div style="background: #fef3c7; padding: 10px; border-radius: 6px; border: 1px solid #fcd34d;">
+                            <div style="font-size: 11px; color: #92400e; font-weight: 600;">Workflow</div>
+                            <div style="font-size: 14px; font-weight: bold; color: #b45309; margin-top: 4px;">${results.workflow_name || 'Unknown'}</div>
+                        </div>
+                    </div>
+                </div>
+
+                ${logHTML ? `
+                    <div style="margin-bottom: 20px;">
+                        <h4 style="margin-bottom: 10px;">Execution Log</h4>
+                        <div class="result-panel" style="max-height: 300px;">
+                            ${logHTML}
+                        </div>
+                    </div>
+                ` : ''}
+
+                ${stateHTML ? `
+                    <div>
+                        <h4 style="margin-bottom: 10px;">Final State</h4>
+                        <div class="result-panel">
+                            ${stateHTML}
+                        </div>
+                    </div>
+                ` : ''}
+            `;
+        } else {
+            container.innerHTML = `
+                <div style="margin-bottom: 20px;">
+                    <h4 style="color: #EF4444; margin-bottom: 10px;">
+                        <i class="fas fa-exclamation-circle"></i> Execution Failed!
+                    </h4>
+                    <div style="background: #fee2e2; padding: 15px; border-radius: 6px; border: 1px solid #fca5a5;">
+                        <p style="color: #991b1b; font-weight: 600; margin-bottom: 8px;">${results.error || 'Unknown error'}</p>
+                        ${results.traceback ? `
+                            <pre style="background: #7f1d1d; color: #fecaca; padding: 10px; border-radius: 4px; font-size: 11px; overflow-x: auto; margin-top: 10px;">${results.traceback}</pre>
+                        ` : ''}
+                    </div>
+                </div>
+            `;
+        }
+
+        document.getElementById('results-modal').classList.add('active');
+        log('Results modal displayed');
+    }
+
+    function closeResultsModal() {
+        document.getElementById('results-modal').classList.remove('active');
+    }
+
+    function exportResults() {
+        alert('Export feature coming soon!');
+    }
+
+    async function saveWorkflow() {
+        console.group('💾 saveWorkflow()');
+
+        if (workflowNodes.length === 0) {
+            alert('No workflow to save');
+            console.groupEnd();
+            return null;
+        }
+
+        const workflowName = document.getElementById('workflow-title').textContent || "My Workflow";
+        // FIX: Always include node code when saving so backend can execute it
+        const customNodes = JSON.parse(localStorage.getItem('customNodes') || '[]');
+        const nodeCodesMap = {};
+        customNodes.forEach(n => { nodeCodesMap[n.id] = n.code || ''; });
+
+        const workflowData = {
+            name: workflowName,
+            description: "Created from LangGraph Dashboard",
+            nodes: workflowNodes.map(node => ({
+                id: node.id,
+                type: node.type,
+                name: node.name || node.id,
+                position: { x: node.x, y: node.y },
+                icon: node.icon,
+                color: node.color,
+                code: node.code || nodeCodesMap[node.id] || ''
+            })),
+            edges: workflowEdges.map(edge => ({
+                id: edge.id,
+                source: edge.source,
+                target: edge.target,
+                sourcePort: edge.sourcePort,
+                targetPort: edge.targetPort
+            })),
+            is_public: true
+        };
+
+        console.log('Sending workflow data:', workflowData);
+
+        try {
+            const response = await fetch('/api/workflows', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify(workflowData)
+            });
+
+            console.log('Response status:', response.status);
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('Server error response:', errorText);
+                throw new Error(`Save failed (${response.status}): ${errorText}`);
+            }
+
+            const result = await response.json();
+            console.log('Server response:', result);
+
+            let savedWorkflowId = null;
+
+            if (result.workflow && result.workflow.id) {
+                savedWorkflowId = result.workflow.id;
+            } else if (result.workflow_id) {
+                savedWorkflowId = result.workflow_id;
+            } else if (result.id) {
+                savedWorkflowId = result.id;
+            }
+
+            if (!savedWorkflowId) {
+                console.error('No workflow ID in response:', result);
+                throw new Error('Server did not return a workflow ID');
+            }
+
+            currentWorkflowId = savedWorkflowId;
+            console.log('✅ currentWorkflowId set to:', currentWorkflowId);
+
+            document.getElementById('workflow-title').textContent =
+                result.workflow?.name || workflowName;
+
+            localStorage.setItem('last_saved_workflow', JSON.stringify({
+                id: currentWorkflowId,
+                name: workflowName,
+                data: workflowData,
+                timestamp: new Date().toISOString(),
+                server_response: result
+            }));
+
+            log(`✅ Workflow saved: ${workflowName} (ID: ${currentWorkflowId})`);
+
+            if (socket) {
+                socket.emit('workflow_update', {
+                    workflow_id: currentWorkflowId,
+                    action: 'saved'
+                });
+            }
+
+            console.groupEnd();
+            return currentWorkflowId;
+
+        } catch (error) {
+            console.error('Save workflow failed:', error);
+            log(`❌ Failed to save workflow: ${error.message}`);
+            alert(`Failed to save workflow:\n${error.message}`);
+            console.groupEnd();
+            throw error;
+        }
+    }
+
+
+    // Replace runWorkflow() in your index.html
+
+// ==================== POLL FOR RESULT (socket fallback) ====================
+async function pollForResult(executionId, label) {
+    const MAX_WAIT_MS   = 600000; // 10 min max (long-running LLM + training)
+    const HEARTBEAT_MS  = 5000;   // check alive every 5s
+    const started       = Date.now();
+    let   lastNode      = '';
+    let   resolvedBySocket = false; // flag: socket already handled completion
+
+    // Allow socket handler to cancel this poll
+    window._activePoll = window._activePoll || {};
+    window._activePoll[executionId] = () => { resolvedBySocket = true; };
+
+    log(`🔄 Waiting for ${label} — backend is running (up to 10 min)...`, 'log-info');
+
+    const timer = setInterval(async () => {
+        // Socket already delivered the result — stop polling silently
+        if (resolvedBySocket) {
+            clearInterval(timer);
+            return;
+        }
+
+        if (Date.now() - started > MAX_WAIT_MS) {
+            clearInterval(timer);
+            log(`⏰ Timed out waiting for ${label} (10 min exceeded)`, 'log-error');
+            updateStatus('Error');
+            return;
+        }
+
+        try {
+            // ── 1. Heartbeat: is backend still alive? ──────────────────────
+            const hbResp = await fetch(`/api/executions/${executionId}/heartbeat`);
+            const hb     = await hbResp.json();
+
+            if (hb.alive) {
+                // Still running — show which node is active
+                const mins = Math.floor(hb.elapsed_s / 60);
+                const secs = hb.elapsed_s % 60;
+                const elapsed = mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
+                if (hb.current_node !== lastNode) {
+                    log(`⏳ Running node: ${hb.current_node} (${elapsed} elapsed)`, 'log-info');
+                    lastNode = hb.current_node;
+                } else {
+                    // Update status bar without spamming log
+                    updateStatus(`Running • ${hb.current_node} • ${elapsed}`);
+                }
+                return; // still alive, keep waiting
+            }
+
+            // ── 2. Backend finished — fetch the actual result ──────────────
+            clearInterval(timer);
+            const resp = await fetch(`/api/executions/${executionId}`);
+            if (resp.status === 202) {
+                // Race condition: heartbeat says done but cache not written yet
+                log('⏳ Finalizing...', 'log-info');
+                setTimeout(() => pollForResult(executionId, label), 2000);
+                return;
+            }
+
+            const data = await resp.json();
+            if (data.status === 'completed') {
+                const result = data.result || {};
+                if (result.execution_log && result.execution_log.length > 0) {
+                    result.execution_log.forEach(entry => logNodeResult(entry));
+                }
+                log(`✅ ${label} complete — ${result.nodes_executed || 0} nodes, ${result.execution_time || ''}`, 'log-ok');
+                updateStatus('Ready');
+                showResultsModal(result);
+            } else if (data.status === 'error') {
+                log(`❌ ${label} error: ${data.error}`, 'log-error');
+                updateStatus('Error');
+            }
+
+        } catch (e) {
+            // Network hiccup — keep polling, log once
+            log(`⚠️ Heartbeat check failed, retrying... (${e.message})`, 'log-info');
+        }
+    }, HEARTBEAT_MS);
+}
+// ====================================================================
+
+// ==================== DEBUG: RUN UNTIL NODE ====================
+async function runUntilNode() {
+    if (workflowNodes.length === 0) {
+        alert('No nodes on canvas yet.');
+        return;
+    }
+
+    // Build ordered node list using BFS (same as backend)
+    function buildOrder(nodes, edges) {
+        const graph = {};
+        nodes.forEach(n => graph[n.id] = []);
+        edges.forEach(e => { if (graph[e.source]) graph[e.source].push(e.target); });
+        const start = nodes.find(n => n.type === 'start' || n.id === 'start');
+        if (!start) return nodes.map(n => n.id);
+        const order = [], visited = new Set(), queue = [start.id];
+        visited.add(start.id);
+        while (queue.length) {
+            const curr = queue.shift();
+            order.push(curr);
+            if (curr === 'end') break;
+            (graph[curr] || []).forEach(nb => { if (!visited.has(nb)) { visited.add(nb); queue.push(nb); }});
+        }
+        return order;
+    }
+
+    const execOrder = buildOrder(workflowNodes, workflowEdges);
+    const nodeNames = execOrder.map(id => {
+        const n = workflowNodes.find(n => n.id === id);
+        return n ? n.name || id : id;
+    });
+
+    // Ask user which node to stop at
+    const listStr = nodeNames.map((name, i) => `${i + 1}. ${name}`).join('\n');
+    const answer = prompt(
+        `Debug Mode — Run pipeline and STOP after which node?\n\n${listStr}\n\nEnter number (1–${nodeNames.length}):`,
+        String(nodeNames.length)
+    );
+    if (!answer) return;
+
+    const stopIdx = parseInt(answer) - 1;
+    if (isNaN(stopIdx) || stopIdx < 0 || stopIdx >= execOrder.length) {
+        alert('Invalid selection.'); return;
+    }
+
+    const stopAfterNodeId = execOrder[stopIdx];
+    const stopAfterName   = nodeNames[stopIdx];
+    log(`🔍 DEBUG MODE: Will stop after "${stopAfterName}"`);
+    updateStatus('Running');
+
+    try {
+        // Trim nodes/edges to only include up to the stop node
+        const trimmedNodeIds = new Set(execOrder.slice(0, stopIdx + 1));
+        const trimmedNodes = workflowNodes.filter(n => trimmedNodeIds.has(n.id));
+        const trimmedEdges = workflowEdges.filter(e =>
+            trimmedNodeIds.has(e.source) && trimmedNodeIds.has(e.target)
+        );
+
+        // Get codes from localStorage
+        const customNodes = JSON.parse(localStorage.getItem('customNodes') || '[]');
+        const nodeCodesMap = {};
+        customNodes.forEach(n => { nodeCodesMap[n.id] = n.code || ''; });
+
+        let workflowIdToExecute = currentWorkflowId;
+        if (!workflowIdToExecute) {
+            workflowIdToExecute = await saveWorkflow();
+            if (!workflowIdToExecute) throw new Error('Could not save workflow to get ID');
+        }
+
+        const executionData = {
+            input: {
+                workflow_name: document.getElementById('workflow-title').textContent + ` [DEBUG→${stopAfterName}]`,
+                nodes: trimmedNodes.map(node => ({
+                    id: node.id,
+                    name: node.name,
+                    type: node.type,
+                    position: { x: node.x, y: node.y },
+                    code: nodeCodesMap[node.id] || node.code || ''
+                })),
+                edges: trimmedEdges,
+                initial_state: initialState,
+                timestamp: new Date().toISOString()
+            }
+        };
+
+        const response = await fetch(`/api/workflows/${workflowIdToExecute}/execute`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+            body: JSON.stringify(executionData)
+        });
+
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const result = await response.json();
+        log(`✅ Debug execution started (stops after "${stopAfterName}"): ${result.execution_id}`);
+        updateStatus('Ready');
+        // Fallback: poll HTTP in case socket missed the result
+        if (result.execution_id) {
+            pollForResult(result.execution_id, `Debug → ${stopAfterName}`);
+        }
+
+    } catch (error) {
+        updateStatus('Error');
+        log(`❌ Debug execution failed: ${error.message}`);
+        alert(`Debug execution failed:\n${error.message}`);
+    }
+}
+// ================================================================
+
+async function runWorkflow() {
+    console.group('🚀 runWorkflow()');
+    console.log('Starting runWorkflow, currentWorkflowId:', currentWorkflowId);
+
+    if (workflowNodes.length === 0) {
+        alert('Please create at least one node before running the workflow');
+        console.groupEnd();
+        return;
+    }
+
+    updateStatus('Running');
+    log('Starting workflow execution...');
+
+    try {
+        let workflowIdToExecute = currentWorkflowId;
+
+        if (!workflowIdToExecute) {
+            log('No workflow ID found. Saving workflow first...');
+            workflowIdToExecute = await saveWorkflow();
+
+            if (!workflowIdToExecute) {
+                throw new Error('Failed to save workflow and get ID');
+            }
+        }
+
+        // Get node codes from localStorage
+        const customNodes = JSON.parse(localStorage.getItem('customNodes') || '[]');
+        const nodeCodesMap = {};
+
+        customNodes.forEach(node => {
+            nodeCodesMap[node.id] = node.code || '';
+        });
+
+        // Build execution data with node codes
+        const executionData = {
+            input: {
+                workflow_name: document.getElementById('workflow-title').textContent,
+                nodes: workflowNodes.map(node => ({
+                    id: node.id,
+                    name: node.name,
+                    type: node.type,
+                    position: { x: node.x, y: node.y },
+                    code: nodeCodesMap[node.id] || ''  // ← Include the Python code!
+                })),
+                edges: workflowEdges,
+                initial_state: initialState,
+                timestamp: new Date().toISOString()
+            }
+        };
+
+        console.log('Execution data (with code):', executionData);
+        log(`Executing workflow: ${workflowIdToExecute}`);
+
+        const response = await fetch(`/api/workflows/${workflowIdToExecute}/execute`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: JSON.stringify(executionData)
+        });
+
+        if (!response.ok) {
+            let errorMessage = `HTTP ${response.status}`;
+
+            if (response.status === 404) {
+                currentWorkflowId = null;
+                log('Workflow not found, resetting ID and trying again');
+                console.groupEnd();
+                return runWorkflow();
+            }
+
+            throw new Error(errorMessage);
+        }
+
+        const result = await response.json();
+        console.log('Execution started:', result);
+
+        if (result.execution_id) {
+            log(`✅ Execution started: ${result.execution_id}`);
+            // Fallback: poll HTTP in case socket missed the result
+            pollForResult(result.execution_id, 'Full Workflow');
+        }
+
+        updateStatus('Ready');
+
+    } catch (error) {
+        console.error('❌ Workflow execution failed:', error);
+        updateStatus('Error');
+        log(`❌ Execution failed: ${error.message}`);
+        alert(`❌ Execution failed:\n${error.message}`);
+    }
+
+    console.groupEnd();
+}
+
+
+    function runWorkflowLocally() {
+        log('Running workflow locally (limited functionality)...');
+        updateStatus('Running');
+
+        let state = JSON.parse(JSON.stringify(initialState));
+        let executionLog = [];
+
+        try {
+            const startNode = workflowNodes.find(n => n.type === 'start' || n.id === 'start');
+
+            if (startNode) {
+                executionLog.push(`Started from node: ${startNode.name || startNode.id}`);
+                state._lastNode = startNode.id;
+            }
+
+            setTimeout(() => {
+                updateStatus('Ready');
+                log('Local execution completed (simulated)');
+                log('Final state: ' + JSON.stringify(state, null, 2));
+
+                showResultsModal({
+                    success: true,
+                    final_state: state,
+                    nodes_executed: workflowNodes.length,
+                    execution_time: '< 1s',
+                    note: 'Local simulation only - full execution requires backend server'
+                });
+            }, 1000);
+
+        } catch (error) {
+            updateStatus('Error');
+            log('Local execution error: ' + error.message);
+        }
+    }
+
+    function connectWebSocket() {
+        if (typeof io === 'undefined') {
+            log('⚠️ socket.io not loaded — running in offline mode (HTTP polling only)', 'log-info');
+            return;
+        }
+        socket = io();
+        socket.on('connect', () => { log('Connected to test_ROSIE server'); });
+        socket.on('connected', (data) => { log(data.message || 'Connected to server'); });
+        socket.on('execution_start', (data) => {
+            log(`Execution ${data.execution_id} started`);
+            updateStatus('Running');
+        });
+        socket.on('node_progress', (data) => {
+            const progress = data.progress ? ` (${Math.round(data.progress)}%)` : '';
+            log(`⏳ ${data.message}${progress}`, 'log-info');
+        });
+        socket.on('execution_progress', (data) => {
+            log(`⏳ Running: ${data.message || data.current_node || ''} (${data.progress || 0}%)`, 'log-info');
+        });
+        socket.on('execution_complete', (data) => {
+            // Cancel any active HTTP poll for this execution
+            if (window._activePoll && window._activePoll[data.execution_id]) {
+                window._activePoll[data.execution_id]();
+                delete window._activePoll[data.execution_id];
+            }
+            const result = data.result || {};
+            // Log each node's result into the panel
+            if (result.execution_log && result.execution_log.length > 0) {
+                result.execution_log.forEach(entry => logNodeResult(entry));
+            }
+            log(`✅ Workflow complete — ${result.nodes_executed || 0} nodes, ${result.execution_time || ''}`, 'log-ok');
+            updateStatus('Ready');
+            showResultsModal(result);
+        });
+        socket.on('node_log', (data) => {
+            // Real-time log lines streamed from inside each node
+            const cls = data.level === 'error'   ? 'log-error'
+                      : data.level === 'success'  ? 'log-ok'
+                      : data.level === 'warning'  ? 'log-info'
+                      : 'log-info';
+            log(`[${data.node}] ${data.message}`, cls);
+        });
+        socket.on('execution_error', (data) => {
+            log(`Error: ${data.error}`);
+            updateStatus('Error');
+        });
+    }
+
+    function log(message, cls = 'log-info') {
+        const logPanel = document.getElementById('log-panel');
+        const entry = document.createElement('div');
+        entry.className = 'log-entry';
+        const time = new Date().toLocaleTimeString();
+        entry.innerHTML = `<span class="log-time">[${time}]</span> <span class="${cls}">${message}</span>`;
+        logPanel.appendChild(entry);
+        logPanel.scrollTop = logPanel.scrollHeight;
+    }
+
+    function logNodeResult(entry) {
+        const panel = document.getElementById('log-panel');
+        const status = entry.status;
+        const icon   = status === 'completed' ? '✅' : status === 'error' ? '❌' : '⏭️';
+        const cls    = status === 'completed' ? 'log-ok' : status === 'error' ? 'log-error' : 'log-skip';
+        const time   = entry.timestamp ? new Date(entry.timestamp).toLocaleTimeString() : '';
+
+        // Header line
+        const header = document.createElement('div');
+        header.className = 'log-entry';
+        header.innerHTML = `<span class="log-time">[${time}]</span> <span class="${cls}">${icon} <b>${entry.node}</b> — ${entry.message || status}</span>`;
+        panel.appendChild(header);
+
+        // Print output (stdout from code)
+        if (entry.output && entry.output.trim()) {
+            entry.output.trim().split('\n').forEach(line => {
+                const d = document.createElement('div');
+                d.className = 'log-entry';
+                d.innerHTML = `<span class="log-time">      </span> <span class="log-val">│ ${escHtml(line)}</span>`;
+                panel.appendChild(d);
+            });
+        }
+
+        // State diff
+        const diff = entry.state_diff || {};
+
+        // Added keys
+        Object.entries(diff.added || {}).forEach(([k, v]) => {
+            const d = document.createElement('div');
+            d.className = 'log-entry';
+            d.innerHTML = `<span class="log-time">      </span> <span class="log-added">  + <span class="log-key">${escHtml(k)}</span> = <span class="log-val">${escHtml(v)}</span></span>`;
+            panel.appendChild(d);
+        });
+
+        // Changed keys
+        Object.entries(diff.changed || {}).forEach(([k, v]) => {
+            const d = document.createElement('div');
+            d.className = 'log-entry';
+            d.innerHTML = `<span class="log-time">      </span> <span class="log-changed">  ~ <span class="log-key">${escHtml(k)}</span>: <span class="log-val">${escHtml(v.before)}</span> → <span class="log-val">${escHtml(v.after)}</span></span>`;
+            panel.appendChild(d);
+        });
+
+        // Error
+        if (entry.error) {
+            entry.error.trim().split('\n').slice(-5).forEach(line => {
+                const d = document.createElement('div');
+                d.className = 'log-entry';
+                d.innerHTML = `<span class="log-time">      </span> <span class="log-error">  ! ${escHtml(line)}</span>`;
+                panel.appendChild(d);
+            });
+        }
+
+        // Separator
+        const sep = document.createElement('div');
+        sep.className = 'log-entry log-sep';
+        sep.textContent = '      ' + '─'.repeat(60);
+        panel.appendChild(sep);
+
+        panel.scrollTop = panel.scrollHeight;
+    }
+
+    function escHtml(str) {
+        return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    function updateStatus(status) {
+        const statusDiv = document.getElementById('status');
+        statusDiv.textContent = status;
+        statusDiv.className = 'status status-' + status.toLowerCase();
+    }
+
+    function recordOperation(operation) {
+        console.log('Recording operation:', operation.type);
+        operationHistory.undoStack.push(operation);
+        operationHistory.redoStack = [];
+
+        if (operationHistory.undoStack.length > operationHistory.MAX_STEPS) {
+            operationHistory.undoStack.shift();
+        }
+
+        updateUndoRedoButtons();
+    }
+
+    function undoAction() {
+        if (operationHistory.undoStack.length === 0) return;
+
+        const lastOperation = operationHistory.undoStack.pop();
+        console.log('Undoing operation:', lastOperation.type);
+
+        switch(lastOperation.type) {
+            case 'add_node':
+                undoAddNode(lastOperation.data);
+                break;
+            case 'delete_node':
+                redoDeleteNode(lastOperation.data);
+                break;
+            case 'add_edge':
+                undoAddEdge(lastOperation.data);
+                break;
+            case 'delete_edge':
+                redoDeleteEdge(lastOperation.data);
+                break;
+            case 'move_node':
+                undoMoveNode(lastOperation.data);
+                break;
+            default:
+                console.log('Unknown operation type:', lastOperation.type);
+        }
+
+        operationHistory.redoStack.push(lastOperation);
+        updateUndoRedoButtons();
+        log(`Undo: ${lastOperation.type} operation`);
+    }
+
+    function redoAction() {
+        if (operationHistory.redoStack.length === 0) return;
+
+        const nextOperation = operationHistory.redoStack.pop();
+        console.log('Redoing operation:', nextOperation.type);
+
+        switch(nextOperation.type) {
+            case 'add_node':
+                redoAddNode(nextOperation.data);
+                break;
+            case 'delete_node':
+                undoDeleteNode(nextOperation.data);
+                break;
+            case 'add_edge':
+                redoAddEdge(nextOperation.data);
+                break;
+            case 'delete_edge':
+                undoDeleteEdge(nextOperation.data);
+                break;
+            case 'move_node':
+                redoMoveNode(nextOperation.data);
+                break;
+            default:
+                console.log('Unknown operation type:', nextOperation.type);
+        }
+
+        operationHistory.undoStack.push(nextOperation);
+        updateUndoRedoButtons();
+        log(`Redo: ${nextOperation.type} operation`);
+    }
+
+    function undoAddNode(nodeData) {
+        const nodeElement = document.getElementById(nodeData.elementId);
+        if (nodeElement && nodeElement.parentNode) {
+            nodeElement.parentNode.removeChild(nodeElement);
+        }
+
+        const nodeIndex = workflowNodes.findIndex(n => n.id === nodeData.id);
+        if (nodeIndex !== -1) {
+            workflowNodes.splice(nodeIndex, 1);
+        }
+
+        updateNodeCountDisplay();
+
+        if (workflowNodes.length === 0) {
+            document.getElementById('canvas-empty-state').style.display = 'block';
+        }
+    }
+
+    function redoAddNode(nodeData) {
+        const canvas = document.getElementById('canvas');
+        const nodeElement = document.createElement('div');
+        nodeElement.className = `canvas-node ${nodeData.type}`;
+        nodeElement.id = nodeData.elementId;
+        nodeElement.dataset.nodeId = nodeData.id;
+        nodeElement.style.left = nodeData.x + 'px';
+        nodeElement.style.top = nodeData.y + 'px';
+
+        const title = nodeData.name || nodeData.id;
+        const icon = nodeData.icon || 'cog';
+        const color = nodeData.color || '#667eea';
+
+        let inputPort = '', outputPort = '';
+        if (nodeData.type === 'start') {
+            outputPort = '<div class="port output" data-port-type="output"><div class="port-tooltip">Output</div></div>';
+            inputPort = '<div class="port" style="visibility: hidden;"></div>';
+        } else if (nodeData.type === 'end') {
+            inputPort = '<div class="port input" data-port-type="input"><div class="port-tooltip">Input</div></div>';
+            outputPort = '<div class="port" style="visibility: hidden;"></div>';
+        } else {
+            inputPort = '<div class="port input" data-port-type="input"><div class="port-tooltip">Input</div></div>';
+            outputPort = '<div class="port output" data-port-type="output"><div class="port-tooltip">Output</div></div>';
+        }
+
+        nodeElement.innerHTML = `
+            <div style="position: relative; height: 100%;">
+                <div><i class="fas fa-${icon}" style="color: ${color}; font-size: 24px;"></i></div>
+                <div style="margin-top: 8px; font-size: 12px; font-weight: 600; color: #333;">${title}</div>
+                <div style="font-size: 9px; color: #999; margin-top: 2px; opacity: 0.7;">ID: ${nodeData.id}</div>
+                <div class="node-ports">
+                    ${inputPort}
+                    <div style="font-size: 8px; color: #999; margin-top: 3px;">${nodeData.type}</div>
+                    ${outputPort}
+                </div>
+            </div>
+        `;
+
+        nodeElement.addEventListener('dblclick', function(e) {
+            e.stopPropagation();
+            editNodeCode(nodeData.id);
+        });
+
+        nodeElement.addEventListener('click', function(e) {
+            e.stopPropagation();
+            selectNode(this);
+        });
+
+        nodeElement.addEventListener('mousedown', function(e) {
+            if (e.target.closest('.port')) return;
+
+            isDraggingNode = true;
+            draggedNode = this;
+            dragStartX = e.clientX;
+            dragStartY = e.clientY;
+
+            const nodeObj = workflowNodes.find(n => n.elementId === this.id);
+            if (nodeObj) {
+                nodeStartX = nodeObj.x;
+                nodeStartY = nodeObj.y;
+            }
+
+            this.style.zIndex = 1000;
+            document.body.style.cursor = 'grabbing';
+            document.body.style.userSelect = 'none';
+
+            e.stopPropagation();
+            e.preventDefault();
+        });
+
+        canvas.appendChild(nodeElement);
+        document.getElementById('canvas-empty-state').style.display = 'none';
+
+        workflowNodes.push(nodeData);
+        updateNodeCountDisplay();
+    }
+
+    function undoAddEdge(edgeData) {
+        const edgeElement = document.getElementById(edgeData.id);
+        if (edgeElement && edgeElement.parentNode) {
+            edgeElement.parentNode.removeChild(edgeElement);
+        }
+
+        const edgeIndex = workflowEdges.findIndex(e => e.id === edgeData.id);
+        if (edgeIndex !== -1) {
+            workflowEdges.splice(edgeIndex, 1);
+        }
+
+        updateEdgeCountDisplay();
+    }
+
+    function redoAddEdge(edgeData) {
+        workflowEdges.push(edgeData);
+
+        drawEdge(edgeData);
+        updateEdgeCountDisplay();
+    }
+
+    function undoMoveNode(moveData) {
+        const nodeElement = document.getElementById(moveData.elementId);
+        if (nodeElement) {
+            nodeElement.style.left = moveData.oldX + 'px';
+            nodeElement.style.top = moveData.oldY + 'px';
+        }
+
+        const node = workflowNodes.find(n => n.elementId === moveData.elementId);
+        if (node) {
+            node.x = moveData.oldX;
+            node.y = moveData.oldY;
+        }
+
+        updateAllEdges();
+    }
+
+    function redoMoveNode(moveData) {
+        const nodeElement = document.getElementById(moveData.elementId);
+        if (nodeElement) {
+            nodeElement.style.left = moveData.newX + 'px';
+            nodeElement.style.top = moveData.newY + 'px';
+        }
+
+        const node = workflowNodes.find(n => n.elementId === moveData.elementId);
+        if (node) {
+            node.x = moveData.newX;
+            node.y = moveData.newY;
+            if (moveData.name) node.name = moveData.name;
+            if (moveData.icon) node.icon = moveData.icon;
+            if (moveData.color) node.color = moveData.color;
+            if (moveData.type) node.type = moveData.type;
+
+            updateCanvasNodeDisplay(node);
+        }
+
+        updateAllEdges();
+    }
+
+    function updateUndoRedoButtons() {
+        const undoBtn = document.getElementById('undo-btn');
+        const redoBtn = document.getElementById('redo-btn');
+
+        undoBtn.disabled = operationHistory.undoStack.length === 0;
+        redoBtn.disabled = operationHistory.redoStack.length === 0;
+
+        undoBtn.title = `Undo (${operationHistory.undoStack.length} available)`;
+        redoBtn.title = `Redo (${operationHistory.redoStack.length} available)`;
+    }
+
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            if (isConnectingMode) {
+                resetConnectingMode();
+            } else {
+                closeModal();
+                closeInitialDataModal();
+                closeResultsModal();
+            }
+        }
+    });
+
+    document.getElementById('code-modal').addEventListener('click', function(e) {
+        if (e.target === this) {
+            closeModal();
+        }
+    });
+
+    document.getElementById('canvas').addEventListener('click', function(e) {
+        if (e.target === this || e.target.id === 'edges-container' || e.target.tagName === 'svg') {
+            document.querySelectorAll('.edge').forEach(edge => edge.classList.remove('selected'));
+            document.getElementById('delete-edge-btn').style.display = 'none';
+            selectedEdge = null;
+
+            document.querySelectorAll('.canvas-node').forEach(node => {
+                const nodeId = node.dataset.nodeId;
+                const nodeObj = workflowNodes.find(n => n.elementId === node.id);
+                if (nodeObj) {
+                    node.style.borderColor = nodeObj.color || getNodeColor(nodeId);
+                } else {
+                    node.style.borderColor = getNodeColor(nodeId);
+                }
+                node.style.boxShadow = '0 2px 8px rgba(0,0,0,0.1)';
+            });
+            document.getElementById('delete-node-btn').style.display = 'none';
+            selectedNode = null;
+        }
+    });
+
+        // Add these functions to the <script> section in index.html
+
+// 1. Load workflow - display list of saved workflows
+async function loadWorkflow() {
+    try {
+        const response = await fetch('/api/workflows');
+        const data = await response.json();
+
+        if (data.workflows && data.workflows.length > 0) {
+            const workflowList = data.workflows.map((wf, idx) =>
+                `${idx + 1}. ${wf.name} (ID: ${wf.id})`
+            ).join('\n');
+
+            const choice = prompt(
+                'Available workflows:\n\n' + workflowList +
+                '\n\nEnter workflow number to load:'
+            );
+
+            if (choice) {
+                const index = parseInt(choice) - 1;
+                if (index >= 0 && index < data.workflows.length) {
+                    await loadWorkflowById(data.workflows[index].id);
+                }
+            }
+        } else {
+            alert('No saved workflows found');
+        }
+    } catch (error) {
+        console.error('Load workflow failed:', error);
+        log('Failed to load workflows: ' + error.message);
+    }
+}
+
+// 2. Load workflow by ID
+async function loadWorkflowById(workflowId) {
+    try {
+        const response = await fetch(`/api/workflows/${workflowId}`);
+        const workflow = await response.json();
+
+        newWorkflow();
+
+        document.getElementById('workflow-title').textContent = workflow.name;
+        currentWorkflowId = workflow.id;
+
+        workflow.nodes.forEach(nodeData => {
+            const canvas = document.getElementById('canvas');
+            const rect = canvas.getBoundingClientRect();
+
+            addNodeToCanvas(
+                nodeData.id,
+                nodeData.type,
+                rect.left + nodeData.position.x,
+                rect.top + nodeData.position.y
+            );
+        });
+
+        workflow.edges.forEach(edgeData => {
+            createEdge(edgeData.source, edgeData.target);
+        });
+
+        log(`Loaded workflow: ${workflow.name}`);
+        updateNodeCountDisplay();
+        updateEdgeCountDisplay();
+
+    } catch (error) {
+        console.error('Load workflow by ID failed:', error);
+        log('Failed to load workflow: ' + error.message);
+    }
+}
+
+function handleFileImport(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            const importedData = JSON.parse(e.target.result);
+
+            // 1. Clear the canvas UI and reset variables
+            const canvas = document.getElementById('canvas');
+            const edgesContainer = document.getElementById('edges-container');
+
+            if (canvas) {
+                // Remove all existing node divs, but keep the SVG container
+                const nodes = canvas.querySelectorAll('.canvas-node');
+                nodes.forEach(n => n.remove());
+            }
+            if (edgesContainer) {
+                edgesContainer.innerHTML = '<defs></defs>';
+            }
+
+            // Reset global arrays
+            workflowNodes = [];
+            workflowEdges = [];
+            nodeCounter = 1;
+            edgeCounter = 1;
+
+            // 2. IMPORTANT: Rebuild the UI Nodes
+            // We loop through the JSON and call your actual drawing function
+            // FIX: Also sync each node's code/spec/llm into localStorage (customNodes)
+            // so that editCustomNode() can find them when the user clicks to edit.
+            const importedCustomNodes = [];
+
+            if (importedData.nodes && Array.isArray(importedData.nodes)) {
+                importedData.nodes.forEach(node => {
+                    // Use your existing function to create the DIVs
+                    // Note: addNodeToCanvas uses clientX/Y, so we simulate them
+                    // by adding the canvas offset back to the stored x/y
+                    const rect = canvas.getBoundingClientRect();
+                    const simulatedClientX = node.x + rect.left + 60;
+                    const simulatedClientY = node.y + rect.top + 30;
+
+                    const newNodeObj = addNodeToCanvas(
+                        node.id,
+                        node.type,
+                        simulatedClientX,
+                        simulatedClientY
+                    );
+
+                    if (newNodeObj) {
+                        if (node.name)       newNodeObj.name       = node.name;
+                        if (node.icon)       newNodeObj.icon       = node.icon;
+                        if (node.color)      newNodeObj.color      = node.color;
+                        if (node.code)       newNodeObj.code       = node.code;
+                        if (node.spec)       newNodeObj.spec       = node.spec;
+                        if (node.llm)        newNodeObj.llm        = node.llm;
+                        if (node.node_class) newNodeObj.node_class = node.node_class;
+                        updateCanvasNodeDisplay(newNodeObj);
+                    }
+
+                    // FIX: Push full node data into customNodes array for localStorage sync
+                    importedCustomNodes.push({
+                        id:         node.id,
+                        name:       node.name       || node.id,
+                        type:       node.type        || 'custom',
+                        node_class: node.node_class  || 'code',
+                        icon:       node.icon        || 'code',
+                        color:      node.color       || '#3B82F6',
+                        code:       node.code        || '',
+                        spec:       node.spec        || {},
+                        llm:        node.llm         || null,
+                    });
+                });
+
+                // FIX: Write all imported nodes into localStorage so editCustomNode() works
+                localStorage.setItem('customNodes', JSON.stringify(importedCustomNodes));
+            }
+
+            // 3. Rebuild the Edges (Lines)
+            if (importedData.edges && Array.isArray(importedData.edges)) {
+                importedData.edges.forEach(edge => {
+                    createEdge(edge.source, edge.target);
+                });
+            }
+
+            // 4. Update the Title
+            if (importedData.name) {
+                document.getElementById('workflow-title').textContent = importedData.name;
+            }
+
+            alert("Workflow recovered and UI rebuilt!");
+
+        } catch (err) {
+            console.error("Recovery failed:", err);
+            alert("Error: This is not a valid workflow JSON file.");
+        }
+    };
+    reader.readAsText(file);
+}
+
+function exportWorkflowToFile() {
+    const workflowTitle = document.getElementById('workflow-title').textContent.trim() || 'untitled_workflow';
+    const stored = JSON.parse(localStorage.getItem('customNodes') || '[]');
+    const storedMap = {};
+    stored.forEach(n => { storedMap[n.id] = n; });
+    const enrichedNodes = workflowNodes.map(node => {
+        const s = storedMap[node.id] || {};
+        return {
+            id: node.id, type: node.type || s.type || 'custom',
+            node_class: node.node_class || s.node_class || 'code',
+            x: node.x, y: node.y,
+            name:  node.name  || s.name  || node.id,
+            icon:  node.icon  || s.icon  || 'code',
+            color: node.color || s.color || '#3B82F6',
+            code:  node.code  || s.code  || '',
+            spec:  node.spec  || s.spec  || {},
+            llm:   node.llm   || s.llm   || null,
+            elementId: node.elementId,
+        };
+    });
+    const data = { nodes: enrichedNodes, edges: workflowEdges, name: workflowTitle, timestamp: new Date().toISOString() };
+    const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `${workflowTitle}.json`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+}
+
+
+
+function newWorkflow() {
+    if (workflowNodes.length > 0) {
+        if (!confirm('Create new workflow? Current work will be lost.')) {
+            return;
+        }
+    }
+
+    workflowNodes.forEach(node => {
+        const element = document.getElementById(node.elementId);
+        if (element && element.parentNode) {
+            element.parentNode.removeChild(element);
+        }
+    });
+
+    workflowEdges.forEach(edge => {
+        const element = document.getElementById(edge.id);
+        if (element && element.parentNode) {
+            element.parentNode.removeChild(element);
+        }
+    });
+
+    workflowNodes = [];
+    workflowEdges = [];
+    currentWorkflowId = null;
+
+    operationHistory.undoStack = [];
+    operationHistory.redoStack = [];
+    updateUndoRedoButtons();
+
+    document.getElementById('workflow-title').textContent = 'New Workflow';
+    document.getElementById('canvas-empty-state').style.display = 'block';
+    updateNodeCountDisplay();
+    updateEdgeCountDisplay();
+
+    log('New workflow created');
+}
+
+// 4. User authentication (optional)
+async function showLoginDialog() {
+    const email = prompt('Enter your email:');
+    if (!email) return;
+
+    const password = prompt('Enter your password:');
+    if (!password) return;
+
+    try {
+        const response = await fetch('/api/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, password })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            localStorage.setItem('auth_token', data.token);
+            localStorage.setItem('user', JSON.stringify(data.user));
+            log(`Logged in as ${data.user.username}`);
+            alert(`Welcome, ${data.user.username}!`);
+        } else {
+            alert('Login failed: ' + data.error);
+        }
+    } catch (error) {
+        console.error('Login failed:', error);
+        alert('Login failed: ' + error.message);
+    }
+}
+
+// 5. Update existing workflow
+async function updateCurrentWorkflow() {
+    if (!currentWorkflowId) {
+        alert('No workflow loaded. Use "Save" instead.');
+        return;
+    }
+
+    const workflowData = {
+        name: document.getElementById('workflow-title').textContent,
+        nodes: workflowNodes.map(node => ({
+            id: node.id,
+            type: node.type,
+            name: node.name || node.id,
+            position: { x: node.x, y: node.y },
+            icon: node.icon,
+            color: node.color
+        })),
+        edges: workflowEdges.map(edge => ({
+            id: edge.id,
+            source: edge.source,
+            target: edge.target
+        }))
+    };
+
+    try {
+        const response = await fetch(`/api/workflows/${currentWorkflowId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(workflowData)
+        });
+
+        const result = await response.json();
+        log(`Workflow updated: ${result.workflow.name}`);
+
+    } catch (error) {
+        console.error('Update failed:', error);
+        log('Failed to update workflow: ' + error.message);
+    }
+}
+
+// 6. Wire these functions to toolbar buttons in HTML
+ // 直接粘贴到 script 标签的最末尾
+document.getElementById('edges-container').addEventListener('click', function(e) {
+    // 检查点击的是不是连线（path 标签）
+    if (e.target.tagName === 'path' || e.target.closest('.edge')) {
+        const edgeElement = e.target.closest('.edge');
+        if (!edgeElement) return;
+
+        const edgeId = edgeElement.id;
+        // 获取这条线的数据
+        const edgeData = workflowEdges.find(ev => ev.id === edgeId);
+
+        if (edgeData && confirm(`Delete this connection: ${edgeData.source} -> ${edgeData.target}?`)) {
+            // 1. 从数据数组移除
+            workflowEdges = workflowEdges.filter(ev => ev.id !== edgeId);
+
+            // 2. 从画面移除
+            edgeElement.remove();
+
+            // 3. 移除箭头
+            const marker = document.getElementById(`arrow-${edgeId}`);
+            if (marker) marker.remove();
+
+            // 4. 更新 UI
+            log(`Deleted connection: ${edgeData.source} -> ${edgeData.target}`);
+            if (typeof updateEdgeCountDisplay === 'function') updateEdgeCountDisplay();
+        }
+    }
+});
+
+function autoLayout() {
+    log("Running Auto Layout with backward loop optimization...");
+
+    // Step 1: Build dependency graph
+    const graph = buildDependencyGraph();
+
+    // Step 2: Assign levels using topological sort (handling cycles)
+    const levels = assignLevelsWithCycles(graph);
+
+    // Step 3: Position nodes with proper spacing
+    positionNodesInLevels(levels);
+
+    // Step 4: Smooth animation for edges
+    animateEdgeUpdates();
+
+    log(`Auto Layout complete: ${Object.keys(levels).length} levels created`);
+}
+
+// Animate edge updates during layout
+function animateEdgeUpdates() {
+    let frame = 0;
+    const maxFrames = 60; // ~1 second at 60fps
+
+    function smoothUpdate() {
+        updateAllEdges(); // Your existing function
+
+        if (frame++ < maxFrames) {
+            requestAnimationFrame(smoothUpdate);
+        } else {
+            // Final update after animation completes
+            updateAllEdges();
+            log("Layout animation complete");
+        }
+    }
+
+    requestAnimationFrame(smoothUpdate);
+}
+
+
+
+// Position nodes in their assigned levels
+function positionNodesInLevels(levels) {
+    const marginX = 100;
+    const marginY = 150;
+    const levelGap = 300;  // Horizontal spacing between levels
+    const nodeGap = 180;   // Vertical spacing between nodes in same level
+
+    // Get canvas dimensions for centering
+    const canvas = document.getElementById('canvas');
+    const canvasHeight = canvas ? canvas.offsetHeight : 800;
+
+    Object.keys(levels).forEach(levelKey => {
+        const levelNum = parseInt(levelKey);
+        const nodesInLevel = levels[levelKey];
+
+        // Calculate total height needed for this level
+        const totalHeight = (nodesInLevel.length - 1) * nodeGap;
+
+        // Center vertically
+        const startY = (canvasHeight - totalHeight) / 2;
+
+        // Position each node
+        nodesInLevel.forEach((node, index) => {
+            const newX = marginX + (levelNum * levelGap);
+            const newY = startY + (index * nodeGap);
+
+            // Update node data
+            node.x = newX;
+            node.y = newY;
+
+            // Update DOM with animation
+            const el = document.getElementById(node.elementId);
+            if (el) {
+                el.style.transition = "all 0.8s cubic-bezier(0.4, 0, 0.2, 1)";
+                el.style.left = newX + 'px';
+                el.style.top = newY + 'px';
+            }
+        });
+    });
+}
+
+
+function assignLevelsWithCycles(graph) {
+    const levels = {};
+    const nodeLevel = new Map();
+    const visited = new Set();
+
+    // Step 1: Find all start nodes (no incoming edges or type='start')
+    const startNodes = [];
+    workflowNodes.forEach(node => {
+        if (node.type === 'start' || graph.inDegree.get(node.id) === 0) {
+            startNodes.push(node.id);
+            nodeLevel.set(node.id, 0);
+        }
+    });
+
+    // Step 2: BFS to assign levels (ignoring backward edges)
+    const queue = [...startNodes];
+    const backwardEdges = new Set(); // Track edges that create cycles
+
+    while (queue.length > 0) {
+        const nodeId = queue.shift();
+        if (visited.has(nodeId)) continue;
+        visited.add(nodeId);
+
+        const currentLevel = nodeLevel.get(nodeId) || 0;
+        const neighbors = graph.adjacency.get(nodeId) || [];
+
+        neighbors.forEach(targetId => {
+            const targetLevel = nodeLevel.get(targetId);
+
+            // Detect backward edge (target already has lower/equal level)
+            if (targetLevel !== undefined && targetLevel <= currentLevel) {
+                backwardEdges.add(`${nodeId}->${targetId}`);
+                return; // Don't propagate through backward edges
+            }
+
+            // Normal forward edge
+            const newLevel = currentLevel + 1;
+            if (targetLevel === undefined || targetLevel < newLevel) {
+                nodeLevel.set(targetId, newLevel);
+                queue.push(targetId);
+            }
+        });
+    }
+
+    // Step 3: Handle unvisited nodes (isolated or in cycles)
+    workflowNodes.forEach(node => {
+        if (!nodeLevel.has(node.id)) {
+            if (node.type === 'end') {
+                // Put end nodes at the highest level
+                const maxLevel = Math.max(...Array.from(nodeLevel.values()), 0);
+                nodeLevel.set(node.id, maxLevel + 1);
+            } else {
+                // Put other unvisited nodes at level 1
+                nodeLevel.set(node.id, 1);
+            }
+        }
+    });
+
+    // Step 4: Group nodes by level
+    workflowNodes.forEach(node => {
+        const level = nodeLevel.get(node.id) || 0;
+        if (!levels[level]) {
+            levels[level] = [];
+        }
+        levels[level].push(node);
+    });
+
+    // Step 5: Sort nodes within each level (optional: by original Y position)
+    Object.keys(levels).forEach(level => {
+        levels[level].sort((a, b) => a.y - b.y);
+    });
+
+    console.log('Backward edges detected:', Array.from(backwardEdges));
+    console.log('Level assignment:', levels);
+
+    return levels;
+}
+
+
+// 负责重绘所有连线
+function updateAllEdges() {
+    workflowEdges.forEach(edge => updateEdge(edge));
+}
+
+// 负责重绘所有连线
+function updateAllEdges() {
+    console.log('Updating all edges, count:', workflowEdges.length);
+    workflowEdges.forEach(edge => updateEdge(edge));
+}
+
+// 核心：负责计算每一条线的贝塞尔路径
+// ============================================================
+// ENHANCED updateEdge() - Better backward loop handling
+// ============================================================
+// This is an improved version of your existing updateEdge function
+// Use this to replace your current updateEdge() function
+
+function updateEdge(edge) {
+    // 1. Find source and target nodes
+    const sourceNode = workflowNodes.find(n => n.id === edge.source);
+    const targetNode = workflowNodes.find(n => n.id === edge.target);
+
+    if (!sourceNode || !targetNode) {
+        console.warn(`Edge ${edge.id}: source or target node not found`);
+        return;
+    }
+
+    // 2. Get DOM elements
+    const sourceElement = document.getElementById(sourceNode.elementId);
+    const targetElement = document.getElementById(targetNode.elementId);
+
+    if (!sourceElement || !targetElement) {
+        console.warn(`Node element not found:`, sourceNode.elementId, targetNode.elementId);
+        return;
+    }
+
+    // 3. Calculate connection points
+    const nodeWidth = sourceElement.offsetWidth || 120;
+    const nodeHeight = sourceElement.offsetHeight || 80;
+
+    const x1 = sourceNode.x + nodeWidth;  // Right side output
+    const y1 = sourceNode.y + (nodeHeight / 2); // Vertically centered
+    const x2 = targetNode.x;  // Left side input
+    const y2 = targetNode.y + (nodeHeight / 2);
+
+    // 4. Determine if this is a backward edge
+    const isBackward = x1 >= x2 || (x1 > x2 - 50); // Add small tolerance
+    let d; // SVG path data
+
+    if (isBackward) {
+        // BACKWARD EDGE: Create loop that goes around
+        const horizontalGap = Math.abs(x1 - x2);
+        const verticalGap = Math.abs(y2 - y1);
+
+        // Determine if we should loop above or below
+        const loopBelow = y1 < y2;
+
+        // Calculate loop depth (how far out the curve goes)
+        const baseDepth = 120;
+        const depthMultiplier = Math.max(1, horizontalGap / 200);
+        const loopDepth = baseDepth * depthMultiplier + verticalGap * 0.3;
+
+        // Calculate the arc point (bottom/top of the loop)
+        const arcY = loopBelow
+            ? Math.max(y1, y2) + loopDepth
+            : Math.min(y1, y2) - loopDepth;
+
+        // Control points for smooth S-curve loop
+        const cp1x = x1 + 100;
+        const cp1y = y1;
+        const cp2x = x1 + 100;
+        const cp2y = arcY;
+        const cp3x = x2 - 100;
+        const cp3y = arcY;
+        const cp4x = x2 - 100;
+        const cp4y = y2;
+
+        // Create smooth cubic bezier path
+        d = `M ${x1} ${y1}
+             C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${(x1 + x2) / 2} ${arcY}
+             C ${cp3x} ${cp3y}, ${cp4x} ${cp4y}, ${x2} ${y2}`;
+
+    } else {
+        // FORWARD EDGE: Standard S-curve
+        const controlPointOffset = Math.abs(x2 - x1) * 0.5;
+        const cp1x = x1 + controlPointOffset;
+        const cp2x = x2 - controlPointOffset;
+
+        d = `M ${x1} ${y1}
+             C ${cp1x} ${y1}, ${cp2x} ${y2}, ${x2} ${y2}`;
+    }
+
+    // 5. Update the SVG path element
+    const edgeGroup = document.getElementById(edge.id);
+    if (!edgeGroup) {
+        console.warn(`Edge group not found: ${edge.id}`);
+        return;
+    }
+
+    const path = edgeGroup.querySelector('.edge-line');
+    if (!path) {
+        console.warn(`Path not found in edge: ${edge.id}`);
+        return;
+    }
+
+    // Apply the new path
+    path.setAttribute('d', d);
+
+    // 6. Apply visual styling based on edge type
+    if (isBackward) {
+        // Backward edges: solid red line (no dashes)
+        path.style.strokeDasharray = "none";
+        path.style.stroke = "#EF4444";
+        path.style.strokeWidth = "2.5";
+        path.style.opacity = "0.9";
+    } else {
+        // Forward edges: solid blue line
+        path.style.strokeDasharray = "none";
+        path.style.stroke = "#6366f1";
+        path.style.strokeWidth = "2";
+        path.style.opacity = "1";
+    }
+
+    // 7. Update arrow marker color
+    const marker = document.getElementById(`arrow-${edge.id}`);
+    if (marker) {
+        const arrow = marker.querySelector('path');
+        if (arrow) {
+            arrow.style.fill = isBackward ? "#EF4444" : "#6366f1";
+        }
+    }
+}
+
+
+// Build graph structure from nodes and edges
+function buildDependencyGraph() {
+    const graph = {
+        adjacency: new Map(),  // nodeId -> [targetIds]
+        inDegree: new Map(),   // nodeId -> count
+        nodes: new Map()       // nodeId -> node object
+    };
+
+    // Initialize all nodes
+    workflowNodes.forEach(node => {
+        graph.adjacency.set(node.id, []);
+        graph.inDegree.set(node.id, 0);
+        graph.nodes.set(node.id, node);
+    });
+
+    // Build adjacency list and count incoming edges
+    workflowEdges.forEach(edge => {
+        if (graph.adjacency.has(edge.source)) {
+            graph.adjacency.get(edge.source).push(edge.target);
+        }
+        if (graph.inDegree.has(edge.target)) {
+            graph.inDegree.set(edge.target, graph.inDegree.get(edge.target) + 1);
+        }
+    });
+
+    return graph;
+}
+
+
+
+
+    async function exportPythonPackage() {
+        // Recover ID from localStorage if lost after reconnect
+        if (!currentWorkflowId) {
+            const saved = localStorage.getItem('last_saved_workflow');
+            if (saved) {
+                try { currentWorkflowId = JSON.parse(saved).id; } catch(e) {}
+            }
+        }
+        if (!currentWorkflowId) {
+            log('💾 Auto-saving before export...');
+            await saveWorkflow();
+        }
+        if (!currentWorkflowId) {
+            log('❌ Save failed — please click Save Workflow manually first.');
+            return;
+        }
+        log('📦 Generating Python package...');
+        window.location.href = `/api/workflows/${currentWorkflowId}/export_package`;
+        log('✅ Python package download started!');
+    }
+
+
+</script>
+
+
+</body>
+</html>

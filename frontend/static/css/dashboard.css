@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>test_ROSIE - LangGraph Dashboard</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: #f5f5f5; height: 100vh; overflow: hidden; }
+        .app { display: flex; height: 100vh; }
+        .sidebar { width: 280px; background: white; border-right: 1px solid #ddd; display: flex; flex-direction: column; overflow-y: auto; }
+        .sidebar .header { padding: 20px; background: linear-gradient(135deg, #667eea, #764ba2); color: white; }
+        .sidebar .header h3 { font-size: 18px; margin-bottom: 4px; }
+        .sidebar .header p { font-size: 12px; opacity: 0.9; }
+        .node-palette { flex: 1; padding: 20px; overflow-y: auto; }
+        .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        .section-title { font-weight: 600; color: #333; font-size: 14px; }
+        .node-count { background: #e9ecef; padding: 2px 8px; border-radius: 12px; font-size: 12px; color: #666; }
+        .node-item { background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 8px; padding: 12px; margin: 8px 0; cursor: move; display: flex; align-items: center; gap: 10px; transition: all 0.2s; }
+        .node-item:hover { background: #e9ecef; border-color: #667eea; }
+        .empty-state { text-align: center; padding: 20px; color: #666; font-size: 14px; }
+        .sidebar-controls { padding: 20px; border-top: 1px solid #ddd; }
+        .control-buttons { display: flex; gap: 8px; margin-bottom: 15px; }
+        .btn { padding: 8px 16px; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; display: inline-flex; align-items: center; gap: 8px; margin: 5px 0; transition: all 0.2s; width: 100%; justify-content: center; }
+        .btn:hover { transform: translateY(-1px); box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .btn-sm { padding: 4px 8px; font-size: 12px; width: auto; }
+        .btn-primary { background: #667eea; color: white; }
+        .btn-success { background: #10B981; color: white; }
+        .btn-secondary { background: #6c757d; color: white; }
+        .btn-warning { background: #F59E0B; color: white; }
+        .btn-danger { background: #EF4444; color: white; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .main { flex: 1; display: flex; flex-direction: column; }
+        .toolbar { padding: 15px 20px; background: white; border-bottom: 1px solid #ddd; display: flex; justify-content: space-between; align-items: center; }
+        .toolbar-left, .toolbar-right { display: flex; align-items: center; gap: 10px; }
+        #workflow-title { font-size: 18px; font-weight: 600; color: #333; margin-right: 10px; }
+        .status { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 500; }
+        .status-ready { background: #d1fae5; color: #065f46; }
+        .counter { font-size: 12px; color: #666; }
+        .canvas { flex: 1; background: white; margin: 20px; border-radius: 8px; border: 2px dashed #ccc; position: relative; overflow: auto; }
+        .canvas-empty-state { text-align: center; padding: 50px; color: #666; position: absolute; top: 0; left: 0; right: 0; bottom: 0; display: flex; flex-direction: column; justify-content: center; align-items: center; }
+        .canvas-empty-state i { margin-bottom: 20px; color: #ccc; }
+        .hint { font-size: 12px; margin-top: 10px; color: #999; }
+        .log-panel { height: 200px; background: #1e293b; color: #e2e8f0; font-family: monospace; padding: 15px; overflow-y: auto; border-top: 1px solid #334155; font-size: 12px; }
+        .log-panel div { margin-bottom: 4px; }
+        .mode-indicator { padding: 4px 12px; border-radius: 4px; background: #e9ecef; font-size: 12px; }
+        .mode-connecting { background: #fef3c7; color: #92400e; }
+        .edges-svg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1; }
+        .modal { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; z-index: 1000; }
+        .modal.active { display: flex; }
+        .modal-content { background: white; border-radius: 12px; width: 90%; max-width: 1000px; max-height: 85vh; display: flex; flex-direction: column; overflow: hidden; }
+        .modal-header { padding: 20px; border-bottom: 1px solid #ddd; display: flex; justify-content: space-between; align-items: center; }
+        .modal-body { flex: 1; padding: 20px; overflow: auto; }
+        .modal-footer { padding: 20px; border-top: 1px solid #ddd; text-align: right; }
+        .code-editor { width: 100%; height: 500px; font-family: 'Monaco', 'Menlo', monospace; font-size: 14px; padding: 15px; border: 1px solid #ddd; border-radius: 6px; resize: none; background: #f8f9fa; }
+        .tab-container { display: flex; border-bottom: 1px solid #ddd; margin-bottom: 15px; }
+        .tab { padding: 10px 20px; cursor: pointer; border-bottom: 2px solid transparent; font-size: 14px; }
+        .tab:hover { color: #667eea; }
+        .tab.active { border-bottom: 2px solid #667eea; font-weight: 600; color: #667eea; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        .param-row { display: flex; align-items: center; margin-bottom: 10px; }
+        .param-row label { width: 120px; font-size: 13px; color: #333; }
+        .param-row input, .param-row select { flex: 1; padding: 6px 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 13px; }
+        .node-props { display: flex; gap: 10px; margin-bottom: 10px; }
+        .node-prop { flex: 1; }
+        .node-prop label { display: block; font-size: 12px; color: #666; margin-bottom: 4px; }
+        .node-prop input, .node-prop select { width: 100%; padding: 6px 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 13px; }
+        
+        /* Canvas nodes */
+        .canvas-node { position: absolute; width: 120px; background: white; border: 2px solid; border-radius: 8px; padding: 10px; text-align: center; cursor: move; box-shadow: 0 2px 8px rgba(0,0,0,0.1); transition: transform 0.2s; z-index: 10; }
+        .canvas-node:hover { transform: scale(1.05); box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+        .canvas-node.start { border-color: #10B981; }
+        .canvas-node.end { border-color: #EF4444; }
+        .canvas-node.custom { border-color: #F59E0B; }
+        .node-ports { display: flex; justify-content: space-between; margin-top: 8px; }
+        .port { width: 12px; height: 12px; border-radius: 50%; background: #ccc; cursor: pointer; position: relative; }
+        .port.input { background: #10B981; }
+        .port.output { background: #3B82F6; }
+        .port:hover { transform: scale(1.3); }
+        
+        /* Edges */
+        .edge-line { stroke: #667eea; stroke-width: 2; fill: none; }
+        .edge-arrow { fill: #667eea; }
+    </style>
+    <script src="https://cdn.socket.io/4.6.0/socket.io.min.js"></script>
+</head>
+<body>
+    <div class="app">
+        <div class="sidebar">
+            <div class="header">
+                <h3><i class="fas fa-project-diagram"></i> test_ROSIE</h3>
+                <p>LangGraph Dashboard</p>
+            </div>
+            
+            <div class="node-palette">
+                <div class="section-header">
+                    <h4 class="section-title">Your Nodes</h4>
+                    <span class="node-count" id="your-nodes-count">0</span>
+                </div>
+                <div id="your-nodes">
+                    <div class="empty-state">No nodes yet. Click "New Node" to create one.</div>
+                </div>
+                
+                <div class="section-header" style="margin-top: 20px;">
+                    <h4 class="section-title">Your Custom Nodes</h4>
+                    <button class="btn btn-sm btn-secondary" id="new-node-btn">
+                        <i class="fas fa-plus"></i> New Node
+                    </button>
+                </div>
+                
+                <div class="node-item" data-type="start" data-id="start" draggable="true">
+                    <i class="fas fa-play" style="color: #10B981;"></i>
+                    <span>Start</span>
+                </div>
+                <div class="node-item" data-type="end" data-id="end" draggable="true">
+                    <i class="fas fa-stop" style="color: #EF4444;"></i>
+                    <span>End</span>
+                </div>
+                <div class="node-item" data-type="custom" data-id="custom" draggable="true">
+                    <i class="fas fa-plus" style="color: #F59E0B;"></i>
+                    <span>Custom Node</span>
+                </div>
+            </div>
+            
+            <div class="sidebar-controls">
+                <div class="section-header">
+                    <h5 style="margin: 0;">Undo/Redo</h5>
+                </div>
+                <div class="control-buttons">
+                    <button class="btn btn-secondary" id="undo-btn" disabled style="flex: 1;">
+                        <i class="fas fa-undo"></i> Undo
+                    </button>
+                    <button class="btn btn-secondary" id="redo-btn" disabled style="flex: 1;">
+                        <i class="fas fa-redo"></i> Redo
+                    </button>
+                </div>
+                
+                <div class="section-header" style="margin-top: 15px;">
+                    <h5 style="margin: 0;">Connection Mode</h5>
+                    <span class="mode-indicator" id="mode-indicator">Normal</span>
+                </div>
+                <button class="btn btn-warning" id="connect-mode-btn">
+                    <i class="fas fa-link"></i> Connect Nodes
+                </button>
+                <button class="btn btn-danger" id="cancel-connect-btn">
+                    <i class="fas fa-times"></i> Cancel Connection
+                </button>
+                
+                <button class="btn btn-primary" id="save-workflow-btn">
+                    <i class="fas fa-save"></i> Save Workflow
+                </button>
+                <button class="btn btn-success" id="run-workflow-btn">
+                    <i class="fas fa-play"></i> Run Workflow
+                </button>
+                <button class="btn btn-secondary" id="initial-data-btn">
+                    <i class="fas fa-cog"></i> Set Initial Data
+                </button>
+            </div>
+        </div>
+        
+        <div class="main">
+            <div class="toolbar">
+                <div class="toolbar-left">
+                    <h3 id="workflow-title">New Workflow</h3>
+                    <span class="status status-ready" id="status">Ready</span>
+                    <span class="counter" id="node-count-display">0 nodes</span>
+                    <span class="counter" id="edge-count-display">0 edges</span>
+                </div>
+                <div class="toolbar-right">
+                    <button class="btn btn-secondary" id="new-workflow-btn">
+                        <i class="fas fa-file"></i> New
+                    </button>
+                    <button class="btn btn-secondary" id="load-workflow-btn">
+                        <i class="fas fa-folder-open"></i> Load
+                    </button>
+                </div>
+            </div>
+            
+            <div class="canvas" id="canvas">
+                <div class="canvas-empty-state" id="canvas-empty-state">
+                    <i class="fas fa-project-diagram fa-3x"></i>
+                    <p>Drag nodes from sidebar to start building</p>
+                    <p class="hint">Double-click nodes to edit their code</p>
+                    <p class="hint">Click "Connect Nodes" to create connections between nodes</p>
+                </div>
+                <svg id="edges-container" class="edges-svg"></svg>
+            </div>
+            
+            <div class="log-panel" id="log-panel">
+                <div>System ready. Drag nodes to create workflow.</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        console.log('Dashboard loaded - CSS is inline');
+        
+        // Test button
+        document.getElementById('new-node-btn').addEventListener('click', () => {
+            alert('New Node button works! Now we need to load the JS modules.');
+            console.log('Button clicked successfully');
+        });
+    </script>
+</body>
+</html>

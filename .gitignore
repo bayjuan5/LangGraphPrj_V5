@@ -1,0 +1,14 @@
+# 忽略 Python 缓存
+__pycache__/
+*.py[cod]
+
+# 忽略你的大型 JSON 数据文件（避免撑爆 GitHub）
+*.json
+
+# 忽略日志和临时文件
+*.log
+.DS_Store
+
+# 如果有虚拟环境文件夹也忽略
+venv/
+.env
