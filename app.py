@@ -1415,12 +1415,20 @@ def main():
     print("  - Better output handling for empty prints")
     print("=" * 60)
 
+    # Auto-open browser (skip if running inside Docker or CI)
+    if os.environ.get("NO_BROWSER") != "1" and os.environ.get("DOCKER") != "1":
+        import threading, webbrowser
+        def _open():
+            import time; time.sleep(1.5)
+            webbrowser.open(f"http://localhost:{port}/")
+        threading.Thread(target=_open, daemon=True).start()
+
     socketio.run(app,
                  host=host,
                  port=port,
-                 debug=True,
-                 use_reloader=False,  # Disable reloader to avoid duplicate connections
-                 allow_unsafe_werkzeug=True)  # Add this line
+                 debug=False,
+                 use_reloader=False,
+                 allow_unsafe_werkzeug=True)
 
 if __name__ == '__main__':
 
