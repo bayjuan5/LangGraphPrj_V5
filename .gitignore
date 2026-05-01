@@ -1,14 +1,30 @@
-# 忽略 Python 缓存
+# Python cache
 __pycache__/
 *.py[cod]
+*.pyo
 
-# 忽略你的大型 JSON 数据文件（避免撑爆 GitHub）
-*.json
+# Virtual environments
+venv/
+.venv/
+env/
 
-# 忽略日志和临时文件
+# Environment secrets
+.env
+
+# Logs / temp
 *.log
 .DS_Store
+Thumbs.db
 
-# 如果有虚拟环境文件夹也忽略
-venv/
-.env
+# Large model / data files — do NOT commit large SVS files
+# The TCGA_test/ sample (~25 MB) IS committed intentionally.
+# Add other large WSI paths here if needed:
+# *.svs
+
+# Generated outputs (run-time artefacts) — keep directory skeleton
+outputs/*
+!outputs/.gitkeep
+
+# IDE
+.idea/
+.vscode/

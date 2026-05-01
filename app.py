@@ -21,8 +21,30 @@ from flask_socketio import SocketIO, emit
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
-from pathlib import Path  # <--- Add this line
+from pathlib import Path
 from dotenv import load_dotenv
+
+# ── TCGA-PAAD default SVS path ────────────────────────────────────────────────
+load_dotenv()
+_HERE = Path(__file__).parent
+
+_SVS_FILENAME = (
+    "TCGA-HZ-7926-01Z-00-DX1."
+    "b3bf02d3-bad0-4451-9c39-b0593f19154c.svs"
+)
+# Priority: SVS_PATH env var → TCGA_test/ subfolder next to app.py
+TCGA_SVS_PATH = os.environ.get(
+    "SVS_PATH",
+    str(_HERE / "TCGA_test" / _SVS_FILENAME),
+)
+OUTPUTS_DIR = _HERE / "outputs"
+OUTPUTS_DIR.mkdir(exist_ok=True)
+
+
+def _load_node_code(filename: str) -> str:
+    """Read a node Python file and return its source as a string."""
+    p = _HERE / "nodes" / filename
+    return p.read_text(encoding="utf-8") if p.exists() else ""
 
 # Configure logging
 logging.basicConfig(
@@ -1023,6 +1045,77 @@ def export_package(workflow_id):
     )
 
 
+# ==================== SVS / PATHOLOGY ROUTES ====================
+
+@app.route('/api/svs/info')
+def svs_info():
+    """Return metadata for the configured SVS file."""
+    path = request.args.get('path', TCGA_SVS_PATH)
+    if not Path(path).exists():
+        return jsonify({'error': f'SVS not found: {path}'}), 404
+    try:
+        from svs_utils import get_slide_info
+        info = get_slide_info(path)
+        return jsonify(info)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/svs/thumbnail')
+def svs_thumbnail():
+    """Return a JPEG thumbnail of the SVS file (max 1024 px on longest side)."""
+    path     = request.args.get('path', TCGA_SVS_PATH)
+    max_size = int(request.args.get('max_size', 1024))
+    if not Path(path).exists():
+        return jsonify({'error': 'SVS not found'}), 404
+    try:
+        from svs_utils import get_thumbnail_bytes
+        data = get_thumbnail_bytes(path, max_size=max_size)
+        return send_file(BytesIO(data), mimetype='image/jpeg')
+    except Exception as e:
+        logger.error(f"Thumbnail error: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/svs/patch')
+def svs_patch():
+    """Return a JPEG 512×512 patch at (x, y) from the SVS level 0."""
+    path       = request.args.get('path', TCGA_SVS_PATH)
+    x          = int(request.args.get('x', 0))
+    y          = int(request.args.get('y', 0))
+    patch_size = int(request.args.get('size', 512))
+    if not Path(path).exists():
+        return jsonify({'error': 'SVS not found'}), 404
+    try:
+        from svs_utils import read_patch_rgb, patch_to_jpeg_bytes
+        rgb   = read_patch_rgb(path, x, y, patch_size)
+        data  = patch_to_jpeg_bytes(rgb)
+        return send_file(BytesIO(data), mimetype='image/jpeg')
+    except Exception as e:
+        logger.error(f"Patch error: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/svs/tissue_tiles')
+def svs_tissue_tiles():
+    """Return JSON list of tissue tile coordinates."""
+    path       = request.args.get('path', TCGA_SVS_PATH)
+    patch_size = int(request.args.get('size', 512))
+    threshold  = float(request.args.get('threshold', 0.4))
+    max_tiles  = int(request.args.get('max', 400))
+    if not Path(path).exists():
+        return jsonify({'error': 'SVS not found'}), 404
+    try:
+        from svs_utils import extract_tissue_tiles
+        tiles = extract_tissue_tiles(path, patch_size=patch_size,
+                                     tissue_threshold=threshold,
+                                     max_tiles=max_tiles)
+        return jsonify({'n_tiles': len(tiles), 'tiles': tiles})
+    except Exception as e:
+        logger.error(f"Tissue tiles error: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
 # ==================== ERROR HANDLERS ====================
 
 @app.errorhandler(404)
@@ -1135,11 +1228,141 @@ def init_database():
                 }
             ]
 
+            # ── TCGA-PAAD computational pathology workflow ──────────────────
+            node1_code  = _load_node_code("node1_tiling.py")
+            node21_code = _load_node_code("node2_1_rosie.py")
+            node22_code = _load_node_code("node2_2_hed.py")
+            node3_code  = _load_node_code("node3_petri_net.py")
+            node4_code  = _load_node_code("node4_niche.py")
+
+            tcga_workflow = {
+                'name': 'TCGA-PAAD Spatiotemporal Pipeline',
+                'description': (
+                    'LLM-orchestrated computational pathology pipeline for '
+                    'spatiotemporal reconstruction of the pancreatic tumour '
+                    'microenvironment from H&E whole-slide images (SVS). '
+                    'Node 1: Adaptive tiling | Node 2.1: ROSIE biomarker inference | '
+                    'Node 2.2: HED segmentation | Node 3: Petri Net temporal model | '
+                    'Node 4: Spatial niche analysis.'
+                ),
+                'nodes': [
+                    {
+                        "id": "start",
+                        "name": "Start",
+                        "type": "start",
+                        "position": {"x": 80, "y": 300},
+                        "code": (
+                            "def process(state, params=None):\n"
+                            "    import os\n"
+                            f"    svs = state.get('svs_path', r'{TCGA_SVS_PATH}')\n"
+                            "    state['svs_path'] = svs\n"
+                            "    state['patch_size'] = 512\n"
+                            "    state['tissue_threshold'] = 0.40\n"
+                            "    state['max_tiles'] = 300\n"
+                            "    print('=== TCGA-PAAD Spatiotemporal Pipeline ===')\n"
+                            "    print(f'SVS : {os.path.basename(svs)}')\n"
+                            "    print(f'Patch: {state[\"patch_size\"]}×{state[\"patch_size\"]} px')\n"
+                            "    return state\n"
+                        ),
+                    },
+                    {
+                        "id": "node1_tiling",
+                        "name": "Node 1 — Adaptive Tiling",
+                        "type": "custom",
+                        "position": {"x": 320, "y": 300},
+                        "code": node1_code,
+                        "spec": {
+                            "description": "Adaptive WSI tiling with tissue detection",
+                            "input_key": "svs_path, patch_size, tissue_threshold",
+                            "output_key": "tiles, n_tiles, wsi_dims",
+                        },
+                    },
+                    {
+                        "id": "node2_1_rosie",
+                        "name": "Node 2.1 — ROSIE Biomarker",
+                        "type": "custom",
+                        "position": {"x": 560, "y": 160},
+                        "code": node21_code,
+                        "spec": {
+                            "description": "50-channel protein inference from H&E colour features",
+                            "input_key": "tiles, svs_path",
+                            "output_key": "protein_matrix, immune_score, stromal_score",
+                        },
+                    },
+                    {
+                        "id": "node2_2_hed",
+                        "name": "Node 2.2 — HED Segmentation",
+                        "type": "custom",
+                        "position": {"x": 560, "y": 440},
+                        "code": node22_code,
+                        "spec": {
+                            "description": "HED colour deconvolution + nucleus segmentation",
+                            "input_key": "tiles, svs_path",
+                            "output_key": "cell_features, n_cells, mean_nuclear_area",
+                        },
+                    },
+                    {
+                        "id": "node3_petri",
+                        "name": "Node 3 — Petri Net",
+                        "type": "custom",
+                        "position": {"x": 800, "y": 300},
+                        "code": node3_code,
+                        "spec": {
+                            "description": "Timed Petri Net temporal immune trajectory",
+                            "input_key": "protein_matrix, immune_score, stromal_score",
+                            "output_key": "temporal_trajectory, tpn_summary",
+                        },
+                    },
+                    {
+                        "id": "node4_niche",
+                        "name": "Node 4 — Spatial Niche",
+                        "type": "custom",
+                        "position": {"x": 1040, "y": 300},
+                        "code": node4_code,
+                        "spec": {
+                            "description": "DBSCAN+KMeans spatial niche construction",
+                            "input_key": "tiles, protein_matrix, wsi_dims",
+                            "output_key": "niches, pathway_heatmap, niche_summary",
+                        },
+                    },
+                    {
+                        "id": "end",
+                        "name": "End",
+                        "type": "end",
+                        "position": {"x": 1280, "y": 300},
+                        "code": (
+                            "def process(state, params=None):\n"
+                            "    print('=== Pipeline Complete ===')\n"
+                            "    print(f'Tiles      : {state.get(\"n_tiles\", 0)}')\n"
+                            "    print(f'Cells      : {state.get(\"n_cells\", 0)}')\n"
+                            "    print(f'Niches     : {state.get(\"n_niches\", 0)}')\n"
+                            "    print(f'Immune score  : {state.get(\"immune_score\", 0):.3f}')\n"
+                            "    print(f'Stromal score : {state.get(\"stromal_score\", 0):.3f}')\n"
+                            "    summary = state.get('niche_summary', '')\n"
+                            "    if summary:\n"
+                            "        print(f'Niche summary: {summary}')\n"
+                            "    return state\n"
+                        ),
+                    },
+                ],
+                'edges': [
+                    {"id": "e_start_n1",   "source": "start",        "target": "node1_tiling"},
+                    {"id": "e_n1_n21",     "source": "node1_tiling", "target": "node2_1_rosie"},
+                    {"id": "e_n1_n22",     "source": "node1_tiling", "target": "node2_2_hed"},
+                    {"id": "e_n21_n3",     "source": "node2_1_rosie","target": "node3_petri"},
+                    {"id": "e_n22_n3",     "source": "node2_2_hed",  "target": "node3_petri"},
+                    {"id": "e_n3_n4",      "source": "node3_petri",  "target": "node4_niche"},
+                    {"id": "e_n4_end",     "source": "node4_niche",  "target": "end"},
+                ],
+            }
+            sample_workflows.append(tcga_workflow)
+            # ── end TCGA workflow ────────────────────────────────────────────
+
             for workflow_data in sample_workflows:
                 workflow = Workflow(
                     name=workflow_data['name'],
                     description=workflow_data['description'],
-                    user_id=demo_user.id,  # Use actual user ID
+                    user_id=demo_user.id,
                     is_public=True
                 )
                 workflow.set_nodes(workflow_data['nodes'])
