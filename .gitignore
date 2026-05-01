@@ -21,6 +21,13 @@ Thumbs.db
 # Add other large WSI paths here if needed:
 # *.svs
 
+# ROSIE model weights — 400 MB, must NOT be committed.
+# Users must request these separately from Enable Medicine.
+# See GET_ROSIE_WEIGHTS.md for instructions.
+rosie_weights.pth
+rosie/rosie_weights.pth
+*.pth
+
 # Generated outputs (run-time artefacts) — keep directory skeleton
 outputs/*
 !outputs/.gitkeep

@@ -227,7 +227,24 @@ Immune score: 0.401   Stromal score: 0.730
 
 ### Node 2.1 — ROSIE Biomarker Inference (`nodes/node2_1_rosie.py`)
 
-**Purpose:** Predict a 50-channel protein expression matrix from H&E colour and texture features, as a surrogate for full ROSIE CNN inference.
+**Purpose:** Predict a 50-channel protein expression matrix from H&E patches using the ROSIE (Rapid On-Slide Immunofluorescence Emulation) deep-learning model developed by Enable Medicine.
+
+> **Important — two operating modes:**
+>
+> | Mode | When | Biological validity |
+> |---|---|---|
+> | **Real ROSIE** | ROSIE weights file is present | Yes — used for manuscript results |
+> | **Demo surrogate** | No weights found (default for reviewers) | No — pipeline testing only |
+>
+> The manuscript results (10,446,317 cells) were produced with the **real ROSIE CNN** on the authors' proprietary KSC mouse H&E images.  
+> The included TCGA-PAAD sample runs the **demo surrogate** by default — sufficient to verify the full pipeline architecture end-to-end.  
+> To enable real inference, see [`GET_ROSIE_WEIGHTS.md`](GET_ROSIE_WEIGHTS.md).
+
+**ROSIE model (Enable Medicine):**
+
+ROSIE is a CNN (EfficientNet backbone) trained by Enable Medicine to predict 50-channel protein expression directly from H&E patches.  
+Model weights (~400 MB) are available on request from [gitlab.com/enable-medicine-public/rosie](https://gitlab.com/enable-medicine-public/rosie) — registration and approval by Enable Medicine required.  
+See [`GET_ROSIE_WEIGHTS.md`](GET_ROSIE_WEIGHTS.md) for step-by-step instructions.
 
 **50-channel protein panel:**
 
@@ -244,30 +261,31 @@ Immune score: 0.401   Stromal score: 0.730
 | Cytokines | GZMB, Perf, IFNg, TNFa, IL6 |
 | Angiogenesis / vascular | VEGFA, CD31, CD34, MMP9, MMP2 |
 
-**Algorithm:**
-1. For each tile, read the RGB patch from the SVS at level 0
-2. Compute a 9-dimensional colour-texture feature vector via Beer–Lambert optical-density decomposition:
-   - Haematoxylin proxy: `0.644·OD_R + 0.717·OD_G + 0.267·OD_B`
-   - Eosin proxy: `0.093·OD_R + 0.954·OD_G + 0.284·OD_B`
-   - RGB saturation mean and std, per-channel texture (std)
-3. Apply a linear projection (9 → 50) with domain-knowledge biases:
-   - Haematoxylin → immune cell channels (CD3, CD4, CD8, FOXP3, CD163)
-   - Eosin → tumour/stromal channels (PanCK, FAP, SMA, ColI)
-   - Saturation → proliferation channels (Ki67, PCNA, pHH3)
-4. Sigmoid normalisation to `[0, 1]`
-5. KMeans (k=3) on the protein matrix to assign microenvironmental zones
-6. Compute summary scores: `immune_score` (T-cell panel mean), `stromal_score` (fibrosis panel mean)
+**Algorithm (real ROSIE mode):**
+1. Load ROSIE CNN from weights file (official `rosie` package or torchvision EfficientNet loader)
+2. For each tile, read the RGB patch from the SVS at level 0
+3. Run forward pass → 50-dimensional sigmoid-normalised protein vector per patch
+4. KMeans (k=3) on the protein matrix to assign microenvironmental zones
+5. Compute summary scores: `immune_score` (T-cell panel mean), `stromal_score` (fibrosis panel mean)
+
+**Algorithm (demo surrogate — no weights):**
+1. For each tile, extract a 9-D colour-texture vector via Beer–Lambert optical-density decomposition
+2. Project 9 → 50 dimensions with a fixed random linear map seeded at 42
+3. Sigmoid normalisation; KMeans and score computation as above
+4. A prominent warning is printed and `rosie_mode = "surrogate_demo"` is recorded in state
 
 **State I/O:**
 
 | Key | Direction | Type | Description |
 |---|---|---|---|
 | `tiles`, `svs_path`, `patch_size` | Input | — | From Node 1 |
-| `protein_matrix` | Output | list[list[float]] | n_tiles × 50 protein values |
+| `protein_matrix` | Output | list[list[float]] | n_tiles x 50 protein values |
 | `protein_channels` | Output | list[str] | 50 channel names |
 | `zone_labels` | Output | list[int] | KMeans zone per tile (0–2) |
 | `immune_score` | Output | float | Mean T-cell panel expression |
 | `stromal_score` | Output | float | Mean fibrosis panel expression |
+| `n_channels` | Output | int | Always 50 |
+| `rosie_mode` | Output | str | `"real_rosie"` or `"surrogate_demo"` |
 
 ---
 
@@ -583,15 +601,20 @@ print(fs['niche_summary'])
 | WSI coverage | ~33% of total area |
 | Tissue fraction range | 0.40–1.00 |
 
-**Node 2.1 — ROSIE Biomarker Inference:**
+**Node 2.1 — ROSIE Biomarker Inference (demo surrogate mode):**
 
-| Metric | Expected Value |
+> **Note:** The values below are from the color-feature demo surrogate, not real ROSIE CNN inference.
+> Real ROSIE weights must be requested separately — see [`GET_ROSIE_WEIGHTS.md`](GET_ROSIE_WEIGHTS.md).
+> The surrogate is sufficient to verify the pipeline runs end-to-end; the numerical scores have no biological meaning.
+
+| Metric | Expected Value (surrogate) |
 |---|---|
+| `rosie_mode` in state | `"surrogate_demo"` |
 | Immune score (T-cell panel) | ~0.40 |
 | Stromal score (fibrosis panel) | ~0.73–0.75 |
-| Top expressed proteins | TIM3, LAG3, PCNA, p63, Ki67 |
+| Top expressed proteins | varies (random projection) |
 
-The high stromal score (>0.70) relative to the immune score (~0.40) is consistent with the known desmoplastic, immune-suppressed microenvironment of pancreatic adenocarcinoma.
+The manuscript results were generated with real ROSIE on the authors' KSC mouse H&E images, not on this TCGA sample.
 
 **Node 2.2 — HED Segmentation:**
 

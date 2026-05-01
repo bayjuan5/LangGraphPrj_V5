@@ -69,7 +69,7 @@ H&E Whole-Slide Image (SVS)
 | Feature | Description |
 |---|---|
 | 🤖 **LLM Orchestration** | LangGraph v1.1.2 state-graph manages node transitions and data-flow |
-| 🔬 **ROSIE Integration** | 50-channel protein expression inferred directly from H&E colour features |
+| 🔬 **ROSIE Integration** | 50-channel protein expression from H&E patches via Enable Medicine CNN (weights requested separately — see [GET_ROSIE_WEIGHTS.md](GET_ROSIE_WEIGHTS.md)); demo surrogate runs without weights |
 | ⏱️ **Temporal Modeling** | Timed Petri Net encodes cell-state transitions across 8 developmental timepoints |
 | 🗺️ **Spatial Niche Analysis** | DBSCAN + KMeans maps pathway programs onto spatially resolved microenvironments |
 | 👁️ **Interactive Dashboard** | Real-time node-by-node execution log, code editor, state diff viewer |
@@ -160,6 +160,7 @@ LangGraphPrj_V5/
 ├── TCGA_test/                # Bundled test sample (open-access, ~25 MB)
 ├── reviewer_colab.ipynb      # Zero-install Colab notebook for reviewers
 ├── REVIEWER_GUIDE.md         # Full reviewer & reproducibility guide
+├── GET_ROSIE_WEIGHTS.md      # How to request ROSIE model weights from Enable Medicine
 ├── setup_and_run.bat         # Windows one-click launcher
 ├── setup_and_run.sh          # macOS/Linux one-click launcher
 ├── frontend/                 # Interactive dashboard (WebSocket, real-time)
