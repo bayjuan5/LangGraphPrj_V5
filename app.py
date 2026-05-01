@@ -815,7 +815,7 @@ def handle_node_created(data):
 @socketio.on('node_deleted')
 def handle_node_deleted(data):
     logger.info(f"Node deleted: {data}")
-    # 广播给其他客户端，告知某个节点已被移除
+    # Broadcast node removal to all connected clients
     emit('node_removed', data, broadcast=True)
 # -----------------------
 
