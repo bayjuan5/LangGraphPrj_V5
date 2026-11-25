@@ -1,0 +1,4 @@
+predictor,LOO_R2,LOO_MAE
+state-transition chain (2 rates),0.24811023159947077,0.15871458607994637
+per-niche linear trend in age (6 params),0.37587084786919334,0.15130098690015648
+"mean occupancy, no age",-0.13777777777777778,0.21516565685826383

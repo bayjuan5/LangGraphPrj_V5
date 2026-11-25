@@ -1,0 +1,28 @@
+{
+ "k": 3,
+ "silhouette": {
+  "3": 0.24651365251892723,
+  "4": 0.24547931001589507,
+  "5": 0.2178424334673182,
+  "6": 0.22754902908215788,
+  "7": 0.20116270263646335
+ },
+ "r2": 0.4697446628386829,
+ "lam": 0.001,
+ "min_rate": 0.02,
+ "features": [
+  "frac_Epithelial",
+  "frac_Mesenchymal",
+  "frac_Hybrid",
+  "frac_Immune",
+  "frac_Endothelial",
+  "frac_Other",
+  "mean_Epi",
+  "mean_Mes",
+  "mean_Imm",
+  "mean_Endo",
+  "mean_Prolif",
+  "mean_ECM"
+ ],
+ "n_tiles": 8906
+}

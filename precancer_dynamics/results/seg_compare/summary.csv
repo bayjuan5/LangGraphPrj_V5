@@ -1,0 +1,13 @@
+,0
+tile_count_pearson_r,0.6677862422703732
+tile_count_median_ratio_b_over_a,0.10303687635574837
+tiles_a_only_total,0.0
+tiles_b_only_total,116.0
+max_frac_cells_b_only,0.07674943566591419
+max_abs_delta_b_extra,0.019990043293876852
+composition_r_Epithelial,0.9809792364809178
+composition_r_Mesenchymal,0.9554636605839536
+composition_r_Hybrid,0.9753292202315442
+composition_r_Immune,0.9544068676477858
+composition_r_Endothelial,0.918231856782296
+composition_r_Other,0.9235228762843417

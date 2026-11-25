@@ -1,0 +1,78 @@
+{
+ "slides": [
+  "F4",
+  "F5",
+  "F6",
+  "F7",
+  "F8",
+  "F9",
+  "F11",
+  "F12",
+  "M4",
+  "M5",
+  "M6",
+  "M8",
+  "M9",
+  "M10",
+  "M11",
+  "M12"
+ ],
+ "tag": "sd",
+ "q": [
+  75,
+  70,
+  80
+ ],
+ "area_filter": true,
+ "n_perm": 10000,
+ "n_boot": 2000,
+ "panels": {
+  "Epi": [
+   "PanCK",
+   "ECad",
+   "EpCAM",
+   "Keratin8/18"
+  ],
+  "Mes": [
+   "Vimentin",
+   "aSMA",
+   "Podoplanin"
+  ],
+  "Imm": [
+   "CD45"
+  ],
+  "T": [
+   "CD3e",
+   "CD4",
+   "CD8"
+  ],
+  "Myeloid": [
+   "CD68",
+   "CD14",
+   "CD163",
+   "CD11c"
+  ],
+  "B": [
+   "CD20",
+   "CD79a"
+  ],
+  "Endo": [
+   "CD31",
+   "CD34"
+  ],
+  "Prolif": [
+   "Ki67",
+   "PCNA"
+  ],
+  "ECM": [
+   "CollagenIV"
+  ],
+  "Checkpoint": [
+   "PDL1",
+   "PD1",
+   "LAG3",
+   "TIGIT",
+   "VISTA"
+  ]
+ }
+}

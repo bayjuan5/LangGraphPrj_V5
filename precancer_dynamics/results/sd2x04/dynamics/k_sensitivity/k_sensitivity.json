@@ -1,0 +1,142 @@
+{
+ "ARI_vs_original_K3": 1.0,
+ "K3": {
+  "K": 3,
+  "names": [
+   "Epi/Mes-rich",
+   "Immune-rich",
+   "Low-signal"
+  ],
+  "n_tiles": [
+   3432,
+   1883,
+   3603
+  ],
+  "spearman_rho": [
+   0.901711994255297,
+   -0.7982368473735417,
+   -0.1759077496989842
+  ],
+  "spearman_p": [
+   1.8260840664811325e-06,
+   0.0002100942383374084,
+   0.5146166486141062
+  ],
+  "chain": [
+   "Immune-rich -> Low-signal",
+   "Low-signal -> Epi/Mes-rich"
+  ],
+  "chain_rates": [
+   0.23055770196347591,
+   0.19263323503654364
+  ],
+  "chain_R2": 0.4975122286815634,
+  "chain_AICc": -89.55007673947584,
+  "full_R2": 0.497465166967496,
+  "full_AICc": -76.76769175826769,
+  "stable_edges": [
+   "Immune-rich -> Low-signal (0.231/wk, LOO 1.00)",
+   "Low-signal -> Epi/Mes-rich (0.193/wk, LOO 1.00)"
+  ]
+ },
+ "K4": {
+  "K": 4,
+  "names": [
+   "Epi-rich",
+   "Immune-rich",
+   "Mes-rich",
+   "Low-signal"
+  ],
+  "n_tiles": [
+   2092,
+   1756,
+   1985,
+   3085
+  ],
+  "spearman_rho": [
+   0.7598032213888897,
+   -0.7982368473735417,
+   0.8810169648789462,
+   -0.3000779259570907
+  ],
+  "spearman_p": [
+   0.0006374678806787639,
+   0.0002100942383374084,
+   6.572747154301066e-06,
+   0.2588066991085063
+  ],
+  "chain": [
+   "Immune-rich -> Low-signal",
+   "Low-signal -> Epi-rich",
+   "Epi-rich -> Mes-rich"
+  ],
+  "chain_rates": [
+   0.24760928334069515,
+   0.2446757923934521,
+   0.2442264818975963
+  ],
+  "chain_R2": 0.4772476137422368,
+  "chain_AICc": -155.43785982131405,
+  "full_R2": 0.4771898933118892,
+  "full_AICc": -124.48134061507255,
+  "stable_edges": [
+   "Epi-rich -> Mes-rich (0.242/wk, LOO 1.00)",
+   "Immune-rich -> Low-signal (0.248/wk, LOO 1.00)",
+   "Low-signal -> Epi-rich (0.243/wk, LOO 1.00)"
+  ]
+ },
+ "K5": {
+  "K": 5,
+  "names": [
+   "Immune-rich",
+   "Low-signal",
+   "Epi-rich",
+   "Mes-rich",
+   "Immune-rich 2"
+  ],
+  "n_tiles": [
+   1111,
+   2656,
+   1974,
+   2009,
+   1168
+  ],
+  "spearman_rho": [
+   -0.802671496525617,
+   -0.10199693049773033,
+   0.7509339230847393,
+   0.8765823157268707,
+   -0.7036309987959368
+  ],
+  "spearman_p": [
+   0.0001821132507607119,
+   0.7070095559619696,
+   0.0008007417073150872,
+   8.388420970932092e-06,
+   0.0023532435448103944
+  ],
+  "chain": [
+   "Immune-rich 2 -> Immune-rich",
+   "Immune-rich -> Low-signal",
+   "Low-signal -> Epi-rich",
+   "Epi-rich -> Mes-rich"
+  ],
+  "chain_rates": [
+   0.22552364329151522,
+   0.41562437634186344,
+   0.2872264228332711,
+   0.2590400304858204
+  ],
+  "chain_R2": 0.4346357992089298,
+  "chain_AICc": -231.8340154261727,
+  "full_R2": 0.46580650566973136,
+  "full_AICc": -175.3125347559768,
+  "stable_edges": [
+   "Immune-rich -> Immune-rich 2 (1.367/wk, LOO 1.00)",
+   "Low-signal -> Epi-rich (0.290/wk, LOO 1.00)",
+   "Epi-rich -> Mes-rich (0.261/wk, LOO 1.00)",
+   "Immune-rich 2 -> Immune-rich (0.782/wk, LOO 1.00)",
+   "Immune-rich 2 -> Low-signal (0.387/wk, LOO 1.00)"
+  ]
+ }
+}
