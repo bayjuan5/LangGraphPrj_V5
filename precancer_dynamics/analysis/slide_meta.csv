@@ -1,0 +1,17 @@
+slide,sex,age_wk,stage,mpp,mpp_verified
+F4,F,4,early,0.5027,True
+F5,F,5,early,0.5027,True
+F6,F,6,adolescence,0.5027,True
+F7,F,7,adolescence,0.5027,True
+F8,F,8,adolescence,0.5027,True
+F9,F,9,adolescence,0.5027,True
+F11,F,11,adulthood,0.5027,True
+F12,F,12,adulthood,0.5027,True
+M4,M,4,early,0.5027,True
+M5,M,5,early,0.5027,True
+M6,M,6,adolescence,0.5027,True
+M8,M,8,adolescence,0.5027,True
+M9,M,9,adolescence,0.5027,True
+M10,M,10,adolescence,0.5027,True
+M11,M,11,adulthood,0.5027,True
+M12,M,12,adulthood,0.5027,True
